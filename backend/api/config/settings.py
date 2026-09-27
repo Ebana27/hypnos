@@ -86,10 +86,13 @@ INSTALLED_APPS = [
     #   accounts     -> User : le seul compte qui peut se connecter
     #   hotels       -> Hotel, TypeDeChambre, Chambre, Personnel
     #   reservations -> Client, Reservation (seule app liee a hotels)
+    #   sync         -> curseur par poste + regles de disponibilite et de
+    #                   validation utilisees par le logiciel desktop
     #   main         -> Notification + actions transverses
     "accounts",
     "hotels",
     "reservations",
+    "sync",
     "main",
     # --- pip install djangorestframework ---
     "rest_framework",

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -51,9 +52,29 @@ class User(AbstractUser):
     role = models.CharField(
         max_length=30, choices=ROLE_CHOICES, default=ROLE_RECEPTIONNISTE
     )
+    # Regle metier : un compte depose dans UN SEUL hotel. Le champ est
+    # reference par "hotels.Hotel" et non importe, sinon accounts et hotels
+    # s'importeraient mutuellement.
+    #
+    # null=True est reserve au superadministrateur de la plateforme, qui
+    # n'appartient a aucun hotel. Toute verification de perimetre doit donc
+    # lire `user.hotel_id is not None` avant de filtrer sur l'hotel.
+    hotel = models.ForeignKey(
+        "hotels.Hotel",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="comptes",
+        help_text="Hotel de rattachement. Vide uniquement pour un administrateur plateforme.",
+    )
 
     class Meta:
         db_table = "user"
 
     def __str__(self):
         return self.username
+
+    @property
+    def est_administrateur_plateforme(self):
+        """Vrai pour le compte sans hotel, qui voit tous les etablissements."""
+        return self.hotel_id is None

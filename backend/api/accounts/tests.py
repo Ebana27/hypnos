@@ -51,6 +51,57 @@ class UserModelTests(TestCase):
         self.assertEqual(addr.user, user)
 
 
+class UserHotelTests(TestCase):
+    """Un compte depose dans un seul hotel."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from hotels.models import Hotel
+
+        cls.hotel_a = Hotel.objects.create(
+            name="A", adresse="a", ville="v", tel="t", email="a@h.dev",
+            nombre_etages=2, nombre_chambres=1,
+        )
+        cls.hotel_b = Hotel.objects.create(
+            name="B", adresse="b", ville="v", tel="t", email="b@h.dev",
+            nombre_etages=2, nombre_chambres=1,
+        )
+
+    def test_account_belongs_to_one_hotel(self):
+        from hotels.models import Personnel
+
+        user = User.objects.create_user(
+            username="a", email="a@hypnos.dev", password="p", hotel=self.hotel_a
+        )
+        Personnel.objects.create(
+            user=user, hotel=self.hotel_a, nom="Nom", prenom="Pre",
+            sexe="M", poste="Reception",
+        )
+        self.assertEqual(user.hotel, self.hotel_a)
+        self.assertFalse(user.est_administrateur_plateforme)
+        # related_name : hotel_a.comptes contient le compte.
+        self.assertIn(user, self.hotel_a.comptes.all())
+
+    def test_platform_admin_has_no_hotel(self):
+        # Cas de fuite : un compte sans hotel voit tous les etablissements.
+        user = User.objects.create_user(
+            username="root", email="root@hypnos.dev", password="p"
+        )
+        self.assertIsNone(user.hotel)
+        self.assertTrue(user.est_administrateur_plateforme)
+
+    def test_hotel_deletion_is_blocked_while_accounts_exist(self):
+        # on_delete=PROTECT : supprimer un hotel effacerait les comptes de
+        # tout son personnel.
+        from django.db.models import ProtectedError
+
+        User.objects.create_user(
+            username="a", email="a@hypnos.dev", password="p", hotel=self.hotel_a
+        )
+        with self.assertRaises(ProtectedError):
+            self.hotel_a.delete()
+
+
 class JWTTokenTests(TestCase):
     """simplejwt doit retrouver l'utilisateur via le champ renomme en id_user."""
 

@@ -1,0 +1,125 @@
+<?xml version="1.0" ?>
+<mxfile host="app.diagrams.net" modified="2026-01-01T00:00:00.000Z" agent="opencode" version="24.7.17" type="device">
+  <diagram id="hypnos-sync" name="Synchronisation">
+    <mxGraphModel dx="1400" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1450" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="11" value="Hypnos — comment fonctionne la synchronisation" style="text;html=1;fontSize=26;fontStyle=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="60" y="25" width="1200" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="12" value="Ta lecture : « c'est juste des données en GET et en POST ». Oui pour le transport — mais le GET/POST ne dit pas qui écrit quoi. Voici le flux réel." style="text;html=1;fontSize=13;fontStyle=2;fontColor=#666666;align=left;" vertex="1" parent="1">
+          <mxGeometry x="60" y="68" width="1300" height="26" as="geometry"/>
+        </mxCell>
+        <mxCell id="13" value="Légende :" style="text;html=1;fontSize=15;fontStyle=1;align=left;fontColor=#2f4f4f;" vertex="1" parent="1">
+          <mxGeometry x="180" y="108" width="300" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="14" value="lecture" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="270" y="106" width="120" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="15" value="écriture serveur" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;align=center;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="400" y="106" width="150" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="16" value="appel HTTP" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;align=center;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="560" y="106" width="130" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="17" value="base locale du poste" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="700" y="106" width="200" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="18" value="1 — Le client réserve une chambre" style="text;html=1;fontSize=15;fontStyle=1;align=left;fontColor=#2f4f4f;" vertex="1" parent="1">
+          <mxGeometry x="180" y="148" width="500" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="19" value="Le client choisit une chambre sur le site web." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="180" y="180" width="520" height="46" as="geometry"/>
+        </mxCell>
+        <mxCell id="20" value="POST  —  l'API vérifie les dates, puis crée la réservation." style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=20;" vertex="1" parent="1">
+          <mxGeometry x="180" y="256" width="520" height="46" as="geometry"/>
+        </mxCell>
+        <mxCell id="21" value="ÉCRITURE dans DATABASE 1&lt;br&gt;chambre = NULL &amp;nbsp;·&amp;nbsp; statut = en_attente" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="180" y="332" width="520" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="22" value="La seule écriture que le site web fait.&lt;br&gt;C'est ici que la demande apparaît,&lt;br&gt;avant toute décision d'un agent." style="text;html=1;fontSize=11;align=left;fontColor=#6b6b6b;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="760" y="332" width="340" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="23" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#808080;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="19" target="20">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="24" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#808080;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="20" target="21">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="25" value="2 — L'agent traite la demande" style="text;html=1;fontSize=15;fontStyle=1;align=left;fontColor=#2f4f4f;" vertex="1" parent="1">
+          <mxGeometry x="180" y="418" width="500" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="26" value="L'agent ouvre le logiciel sur son poste." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="180" y="452" width="520" height="46" as="geometry"/>
+        </mxCell>
+        <mxCell id="27" value="GET /api/sync/en-attente/  —  avec son JWT" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=20;" vertex="1" parent="1">
+          <mxGeometry x="180" y="528" width="520" height="46" as="geometry"/>
+        </mxCell>
+        <mxCell id="28" value="Un GET ne modifie rien,&lt;br&gt;quel que soit le nombre de fois&lt;br&gt;où tu le rappelles." style="text;html=1;fontSize=11;align=left;fontColor=#6b6b6b;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="760" y="528" width="340" height="46" as="geometry"/>
+        </mxCell>
+        <mxCell id="29" value="l'API lit la file : statut = en_attente,&lt;br&gt;et l'hôtel du compte connecté" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="180" y="604" width="520" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="30" value="Filtré sur l'hôtel : un agent&lt;br&gt;de l'hôtel A ne voit jamais&lt;br&gt;la file de l'hôtel B." style="text;html=1;fontSize=11;align=left;fontColor=#6b6b6b;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="760" y="604" width="340" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="31" value="RÉPONSE JSON — la file d'attente" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="180" y="692" width="520" height="46" as="geometry"/>
+        </mxCell>
+        <mxCell id="32" value="Le poste garde ça en mémoire&lt;br&gt;pour ne pas re-demander à chaque fois." style="text;html=1;fontSize=11;align=left;fontColor=#6b6b6b;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="760" y="692" width="340" height="46" as="geometry"/>
+        </mxCell>
+        <mxCell id="33" value="GET /api/sync/res/&amp;lt;n&amp;gt;/propositions/&lt;br&gt;les 3 chambres libres les moins chères" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=20;" vertex="1" parent="1">
+          <mxGeometry x="180" y="768" width="520" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="34" value="Si la chambre demandée est libre,&lt;br&gt;elle fait partie des propositions." style="text;html=1;fontSize=11;align=left;fontColor=#6b6b6b;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="760" y="768" width="340" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="35" value="POST /api/sync/res/&amp;lt;n&amp;gt;/valider/&lt;br&gt;l'agent confirme une chambre, ou refuse avec un motif" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=20;" vertex="1" parent="1">
+          <mxGeometry x="180" y="856" width="520" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="36" value="Le poste envoie une décision,&lt;br&gt;pas des données métier." style="text;html=1;fontSize=11;align=left;fontColor=#6b6b6b;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="760" y="856" width="340" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="37" value="ÉCRITURE dans DATABASE 1&lt;br&gt;statut = confirmée  |  annulée" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="180" y="944" width="520" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="38" value="L'API refuse si la chambre a été&lt;br&gt;prise entre-temps ; la demande&lt;br&gt;reste alors en attente." style="text;html=1;fontSize=11;align=left;fontColor=#6b6b6b;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="760" y="944" width="340" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="39" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#808080;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="26" target="27">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="40" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#808080;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="27" target="29">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="41" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#808080;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="29" target="31">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="42" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#808080;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="31" target="33">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="43" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#808080;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="33" target="35">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="44" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#808080;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="35" target="37">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="45" value="DATABASE 2&lt;br&gt;&lt;font size='9'&gt;cache local du poste&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#f5f5f5;strokeColor=#666666;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="660" width="200" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="46" value="JSON reçu" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#999999;dashed=1;endArrow=blockThin;endFill=1;fontSize=10;" edge="1" parent="1" source="31" target="45">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="47" value="&lt;b&gt;&lt;font size='14'&gt;Ce que cette synchronisation n'est PAS&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Ce n'est pas une réplication bidirectionnelle.&lt;/b&gt; Le poste n'envoie jamais ses données métier vers l'API : il n'envoie qu'une décision. Il n'y a donc &lt;b&gt;aucun conflit d'écriture&lt;/b&gt; à résoudre, et aucun champ « date de synchronisation » à comparer entre les deux bases.&lt;br&gt;&lt;br&gt;&lt;b&gt;Ce n'est pas une base à jour.&lt;/b&gt; DATABASE 2 ne contient que la file d'attente telle qu'elle était au dernier appel. Si le réseau tombe, l'agent voit une file périmée — et la confirmation refusée au retour le lui dira.&lt;br&gt;&lt;br&gt;&lt;b&gt;Le sens des écritures est unique :&lt;/b&gt; seul le serveur écrit dans DATABASE 1. Le logiciel local ne fait que lire, sauf la décision de l'agent." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=left;verticalAlign=top;spacingLeft=14;spacingTop=8;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1060" width="1240" height="175" as="geometry"/>
+        </mxCell>
+        <mxCell id="48" value="&lt;b&gt;&lt;font size='14'&gt;Ce qui est déjà écrit dans le code&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;✅ Modèles &lt;b&gt;User.hotel&lt;/b&gt;, &lt;b&gt;Reservation.chambre&lt;/b&gt; (nullable), &lt;b&gt;chambre_demandee&lt;/b&gt;, &lt;b&gt;SyncCursor&lt;/b&gt;, &lt;b&gt;JournalSync&lt;/b&gt;&lt;br&gt;✅ Logique métier testée dans &lt;b&gt;sync/services.py&lt;/b&gt; — disponibilité, file d'attente, validation (30 tests)&lt;br&gt;⬜ Les points d'entrée HTTP ci-dessus &lt;b&gt;ne sont pas encore écrits&lt;/b&gt; (ni en Python ni en JavaScript) : ce schéma décrit la cible, pas l'état actuel." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;verticalAlign=top;spacingLeft=14;spacingTop=8;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1255" width="1240" height="95" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
