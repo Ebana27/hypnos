@@ -1,0 +1,44 @@
+# --- Core framework -------------------------------------------------------
+# pip install Django==6.1.1
+Django==6.1.1
+# Dépendance directe de Django (ASGI/WSGI). Installée automatiquement.
+asgiref==3.12.1
+# Drivers SQL + timezones. Installés automatiquement par Django.
+sqlparse==0.6.0
+tzdata==2026.4
+
+# --- API REST (consommée par le site web ET l'app desktop Electron) -------
+# pip install djangorestframework
+djangorestframework==3.18.1
+# pip install djangorestframework-simplejwt
+# Authentification par jetons JWT : le desktop Electron et le site
+# stockent un access/refresh token au lieu d'un cookie de session.
+djangorestframework_simplejwt==5.5.1
+# pip install PyJWT
+# Backend de signature HS256 utilisé par simplejwt.
+PyJWT==2.14.0
+
+# --- Authentification classique (django-allauth) --------------------------
+# pip install django-allauth
+# Gestion inscription/connexion/réinitialisation de mot de passe.
+# Complète Django auth (login) : allauth apporte le signup et le
+# "mot de passe oublié", absents de django.contrib.auth.
+django-allauth==65.19.4
+
+# --- CORS ---------------------------------------------------------------
+# pip install django-cors-headers
+# Autorise le navigateur du site web (http://localhost:5173) et
+# l'origine file:// de l'app Electron à appeler l'API Django.
+django-cors-headers==4.9.0
+
+# --- Traitement d'images ------------------------------------------------
+# pip install pillow
+# Backend obligatoire pour models.ImageField : sans pillow, Django
+# refuse de valider une image. Prévu pour les photos d'hôtel/chambres.
+pillow==12.3.0
+
+# --- Configuration par variables d'environnement -------------------------
+# pip install python-decouple
+# Lit SECRET_KEY / DEBUG / DATABASE_URL depuis un fichier .env afin de
+# ne jamais committer de secrets dans le dépôt.
+python-decouple==3.8

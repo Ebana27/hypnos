@@ -1,0 +1,63 @@
+# ============================================================
+# Publication de l'application desktop (electron-builder)
+# ============================================================
+# Declenche uniquement sur un tag git : git tag v1.0.0 && git push --tags
+# Ce n'est PAS le meme fichier que ci-desktop.yml : la CI de develop
+# verifie seulement que le code compile, ce workflow fabrique et publie
+# l'installeur, ce qui demande beaucoup plus de temps et de dependances
+# systeme.
+# ============================================================
+name: Release - App desktop
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  # Permet aussi de lancer manuellement depuis l'onglet Actions.
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Empaquetage ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            build_script: build:win
+          - os: macos-latest
+            build_script: build:mac
+          - os: ubuntu-latest
+            build_script: build:linux
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Installer Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Installer les dependances
+        # Ici on garde le postinstall : electron-builder a besoin de ses
+        # dependances natives pour produire un installeur fonctionnel.
+        run: npm ci
+        working-directory: frontend/desktop/hypnos
+
+      - name: Empaqueter l'application
+        # electron-builder produit un installeur pour l'OS du runner.
+        # Chaque OS est donc traite par un job independant.
+        run: npm run ${{ matrix.build_script }}
+        working-directory: frontend/desktop/hypnos
+
+      - name: Publier l'installeur
+        uses: softprops/action-gh-release@v2
+        with:
+          files: frontend/desktop/hypnos/dist/*
+          draft: true
+          generate_release_notes: true

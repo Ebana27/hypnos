@@ -1,0 +1,87 @@
+# ============================================================
+# CI du BACKEND Django (backend/api)
+# ============================================================
+# Le bloc `paths:` est la cle de la strategie monorepo : ce workflow ne
+# demarre QUE si un fichier de backend/api a change. Un push qui ne touche
+# que le site web ne lance donc pas 15 minutes de tests Python.
+#
+# Pour que le workflow tourne aussi sur une Pull Request qui touche
+# plusieurs applications, chaque workflow declare ses propres paths.
+# ============================================================
+name: CI - API Django
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "backend/api/**"
+      - ".github/workflows/ci-api.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "backend/api/**"
+      - ".github/workflows/ci-api.yml"
+
+concurrency:
+  # Un nouveau push annule le run en cours sur la meme branche : on ne
+  # gaspille pas de minutes sur un commit deja obsolete.
+  group: ci-api-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests Django
+    runs-on: ubuntu-latest
+
+    env:
+      # Valeurs factices : aucune donnee reelle n'est utilisee.
+      # `CI` est pose automatiquement par GitHub Actions et force
+      # DEBUG=False dans config/settings.py.
+      SECRET_KEY: ci-secret-key-not-used-in-production
+      DEBUG: "0"
+      ALLOWED_HOSTS: localhost
+      ACCOUNT_EMAIL_VERIFICATION: optional
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Installer Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/api/requirements.txt
+
+      - name: Installer les dependances
+        working-directory: backend/api
+        run: |
+          python -m pip install --upgrade pip
+          # requirements.txt doit etre en UTF-8 : un fichier UTF-16 fait
+          # echouer `pip install -r` sur les runners Linux.
+          pip install -r requirements.txt
+
+      - name: Verifier la configuration Django
+        working-directory: backend/api
+        run: python manage.py check --deploy --fail-level ERROR
+        continue-on-error: true
+
+      - name: Verifier qu'aucune migration n'est oubliee
+        working-directory: backend/api
+        # Echoue si models.py a ete modifie sans makemigrations.
+        # C'est le piege le plus frequent en Django : le code est correct
+        # en developpement, mais la CI plante en production.
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Appliquer les migrations
+        working-directory: backend/api
+        run: python manage.py migrate --noinput
+
+      - name: Collecter les fichiers statiques
+        working-directory: backend/api
+        # Verifie que la config de production (STATIC_ROOT) est coherente.
+        run: python manage.py collectstatic --noinput
+
+      - name: Lancer les tests
+        working-directory: backend/api
+        run: python manage.py test --verbosity 2 --parallel
