@@ -9,11 +9,18 @@ Non ajoute volontairement : le routage n'est pas dans le perimetre de la
 creation des applications.
 """
 
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import ClientViewSet, DemandeViewSet, ReservationViewSet
 
 app_name = "reservations"
 
+router = DefaultRouter()
+
+router.register(r'clients', ClientViewSet, basename='client')
+router.register(r'demandes', DemandeViewSet, basename='demande')
+router.register(r'reservations', ReservationViewSet, basename='reservation')
+
 urlpatterns = [
-    # Les vues DRF se declarent ici, par exemple :
-    # path("disponibilite/", DisponibiliteView.as_view(), name="disponibilite"),
+    path("", include(router.urls)),
 ]

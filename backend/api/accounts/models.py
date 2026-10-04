@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -52,24 +51,31 @@ class User(AbstractUser):
     role = models.CharField(
         max_length=30, choices=ROLE_CHOICES, default=ROLE_RECEPTIONNISTE
     )
-    # Regle metier : un compte depose dans UN SEUL hotel. Le champ est
-    # reference par "hotels.Hotel" et non importe, sinon accounts et hotels
-    # s'importeraient mutuellement.
+    # Regle metier : « a chaque hotel son utilisateur ». Un compte
+    # appartient donc exactement a un hotel, comme ses employes.
     #
-    # null=True est reserve au superadministrateur de la plateforme, qui
-    # n'appartient a aucun hotel. Toute verification de perimetre doit donc
-    # lire `user.hotel_id is not None` avant de filtrer sur l'hotel.
+    # null=True reste autorise UNIQUEMENT pour is_superuser : sinon
+    # impossible de creer le tout premier compte, puisque createsuperuser
+    # doit fonctionner avant qu'un hotel existe. La contrainte ci-dessous
+    # rend cette exception explicite AU NIVEAU BASE, donc un compte sans
+    # hotel ne peut etre qu'un superadministrateur, jamais un simple oubli.
     hotel = models.ForeignKey(
         "hotels.Hotel",
         on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name="comptes",
-        help_text="Hotel de rattachement. Vide uniquement pour un administrateur plateforme.",
+        help_text="Hotel de rattachement. Vide uniquement pour un superadministrateur.",
     )
 
     class Meta:
         db_table = "user"
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(hotel__isnull=False) | models.Q(is_superuser=True),
+                name="user_hotel_ou_superuser",
+            ),
+        ]
 
     def __str__(self):
         return self.username

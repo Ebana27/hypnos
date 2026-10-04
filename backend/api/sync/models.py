@@ -81,8 +81,11 @@ class JournalSync(models.Model):
         on_delete=models.CASCADE,
         related_name="journaux_sync",
     )
-    reservation = models.ForeignKey(
-        "reservations.Reservation",
+    # La decision de l'agent porte toujours sur une DEMANDE : c'est elle
+    # que l'agent accepte ou refuse. La Reservation qui en decoule est
+    # tracee par Reservation.demande, donc ce lien suffit a relier les deux.
+    demande = models.ForeignKey(
+        "reservations.Demande",
         on_delete=models.CASCADE,
         related_name="journaux_sync",
     )
@@ -103,4 +106,4 @@ class JournalSync(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.action} res#{self.reservation_id} ({self.horodatage:%d/%m %H:%M})"
+        return f"{self.action} demande#{self.demande_id} ({self.horodatage:%d/%m %H:%M})"

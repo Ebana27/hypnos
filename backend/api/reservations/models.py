@@ -1,28 +1,22 @@
-from django.core.exceptions import ValidationError
+﻿from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
 
-from hotels.models import Chambre
+from hotels.models import Chambre, Hotel
 
 
 class Client(models.Model):
     """
-    Fiche client saisie au moment de la reservation.
+    Fiche client saisie au moment de la demande.
 
     CE N'EST PAS UN COMPTE. Client n'herite pas de AbstractUser et n'a
     aucun mot de passe : il n'existe que pour porter les informations
-    laissees par l'hote lors d'une reservation. Il n'y a donc ni session,
-    ni JWT, ni django-allauth pour cette table (les comptes techniques
-    sont dans accounts.User).
+    laissees par l'hote. Il n'y a donc ni session, ni JWT, ni django-allauth
+    pour cette table (les comptes techniques sont dans accounts.User).
 
-    Consequence : pas de champ password ici. Un ancien `password` en clair
-    a ete retire : il n'etait jamais hache, donc lisible en base, et
-    inutile puisque Client ne s'authentifie pas.
-
-    Une nouvelle ligne est creee a chaque reservation : `email` est donc
-    indexe mais NON unique, pour qu'un meme hote puisse reserver
-    plusieurs fois.
+    Une nouvelle ligne est creee a chaque demande : `email` est donc indexe
+    mais NON unique, pour qu'un meme hote puisse reserver plusieurs fois.
     """
 
     SEXE_M = "M"
@@ -35,8 +29,9 @@ class Client(models.Model):
     tel = models.CharField(max_length=30)
     email = models.EmailField(max_length=255, db_index=True)
     document = models.CharField(
-        max_length=255, blank=True, help_text="Type/numerode piece d'identite."
+        max_length=255, blank=True, help_text="Type/numero de piece d'identite."
     )
+    # Rajouter un help_text sur preference
     preference = models.CharField(max_length=255, blank=True)
     sexe = models.CharField(max_length=1, choices=SEXE_CHOICES)
     loyalty = models.BooleanField(default=False)
@@ -44,7 +39,6 @@ class Client(models.Model):
     class Meta:
         db_table = "client"
         indexes = [
-            # Recherche par nom + prenom a la saisie d'une reservation.
             models.Index(fields=["nom", "prenom"], name="client_nom_prenom_idx"),
         ]
 
@@ -52,95 +46,164 @@ class Client(models.Model):
         return f"{self.prenom} {self.nom}"
 
 
-class Reservation(models.Model):
+class _ReglesMetier(models.Model):
     """
-    Reservation d'une chambre par un client, sur une plage de dates.
+    Regles communes a Demande et Reservation.
 
-    Foreign keys
-    ------------
-    * client          -> PROTECT : un client peut avoir plusieurs reservations,
-      l'inverse n'a pas de sens. PROTECT interdit la suppression du client
-      tant qu'une reservation existe, ce qui preserve l'historique.
-    * chambre         -> hotels.Chambre, PROTECT, NULLABLE. Une
-      pseudo-reservation creee depuis le site web n'a pas encore de chambre :
-      c'est l'agent qui l'attribue au moment de la validation. PROTECT evite
-      qu'une reservation terminee ne disparaisse avec la chambre.
-    * chambre_demandee-> hotels.Chambre, NULLABLE. Chambre choisie par le
-      client sur le site. Conservee meme si l'agent attribue finalement une
-      autre chambre, pour le suivi commercial et le taux de changement.
+    Mixin abstrait, jamais utilise comme table. `Meta.abstract` suffit a
+    dire a Django de ne pas creer de table : aucun champ n'est declare ici,
+    chaque classe fille declare les siens, et les methodes ci-dessous y
+    accedent par `self`.
 
-    Seul lien entre l'application `reservations` et l'application `hotels`.
-    Les deux references sont facultatives, donc aucune dependance dure
-    n'est creee entre les deux applications au niveau des migrations.
+    Factorise ce qui est IDENTIQUE entre une demande et une reservation :
+        - la coherence hotel / chambre (incoherence 2)
+        - l'ordre des dates
+        - le nombre de personnes
+    """
 
-    Les regles de gestion ci-dessous sont appliquees DEUX fois :
-      1. CheckConstraint : garantie par la base, meme en cas d'INSERT brut
-         via SQL ou via le shell.
-      2. clean() : message d'erreur lisible, execute via full_clean() dans
-         save() et automatiquement par les ModelForm / DRF serializers.
+    class Meta:
+        abstract = True
+
+    def _chambre_de_reference(self):
+        """La chambre qui porte la regle de capacite pour cet objet."""
+        raise NotImplementedError
+
+    def _nom_champ_chambre(self):
+        """Nom du champ a signaler en cas de chambre d'un autre hotel."""
+        raise NotImplementedError
+
+    def _verifier_capacite(self):
+        chambre = self._chambre_de_reference()
+        if chambre is None or not self.nombreDePersonne:
+            return
+        capacite = chambre.type_chambre.capacite
+        if self.nombreDePersonne > capacite:
+            raise ValidationError(
+                {
+                    "nombreDePersonne": (
+                        f"La chambre {chambre.numero} accepte au maximum "
+                        f"{capacite} personne(s)."
+                    )
+                }
+            )
+
+    def _verifier_meme_hotel(self, chambre, champ):
+        """
+        Coherence 2 : la chambre et l'objet doivent appartenir au meme hotel.
+
+        `hotel_id` est porte par l'objet, `chambre.hotel_id` par la chambre.
+        Comme ce sont deux colonnes, rien ne les lie au niveau base : d'ou
+        cette verification. Elle est appelee par clean() ET reappliquee par
+        les CheckConstraint / validations de `save()`.
+        """
+        if chambre is None or self.hotel_id is None:
+            return
+        if chambre.hotel_id != self.hotel_id:
+            raise ValidationError(
+                {
+                    champ: (
+                        f"La chambre {chambre.numero} n'appartient pas a cet "
+                        f"hotel. Elle a ete reservee dans un autre etablissement."
+                    )
+                }
+            )
+
+    def _verifier_dates(self):
+        if self.date_debut and self.date_fin and self.date_fin <= self.date_debut:
+            raise ValidationError(
+                {"date_fin": "Le depart doit etre posterieur a l'arrivee."}
+            )
+
+    @property
+    def nombre_de_nuits(self):
+        """
+        Duree du sejour, en nuits.
+
+        On compte les nuits, donc sur les dates et non sur les heures :
+        une arrivee le 1er a 22 h et un depart le 3 a 11 h font 2 nuits,
+        meme si la premiere nuit est tres courte.
+        """
+        if not self.date_debut or not self.date_fin:
+            return 0
+        return max((self.date_fin.date() - self.date_debut.date()).days, 0)
+
+    def clean(self):
+        self._verifier_dates()
+        self._verifier_meme_hotel(self._chambre_de_reference(), self._nom_champ_chambre())
+        self._verifier_capacite()
+
+    def save(self, *args, **kwargs):
+        # Django n'appelle clean() que depuis un ModelForm. On le branche ici
+        # pour que les regles s'appliquent aussi quand du code appelle
+        # .save() directement.
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class Demande(_ReglesMetier):
+    """
+    Demande de chambre emmanant du site web, en attente de l'agent.
+
+    C'est une DEMANDE, pas une reservation : elle ne contient aucune
+    chambre attribuee. La chambre que le client a demandee est conservee
+    dans `chambre_demandee`, meme si l'agent attribue finalement une autre
+    chambre -- c'est ce qui permet de mesurer le taux de changement.
+
+    Quand l'agent accepte, `sync.services.valider_demande()` cree une
+    Reservation a partir de cette demande et passe la demande a "acceptee".
+    Les deux lignes sont conservees : la demande garde la trace de ce que le
+    client voulait, la reservation porte ce qui est reellement bloque.
     """
 
     STATUT_EN_ATTENTE = "en_attente"
-    STATUT_CONFIRMEE = "confirmee"
-    STATUT_ANNULEE = "annulee"
-    STATUT_TERMINEE = "terminee"
+    STATUT_ACCEPTEE = "acceptee"
+    STATUT_REFUSEE = "refusee"
     STATUT_CHOICES = [
         (STATUT_EN_ATTENTE, "En attente"),
-        (STATUT_CONFIRMEE, "Confirmee"),
-        (STATUT_ANNULEE, "Annulee"),
-        (STATUT_TERMINEE, "Terminee"),
+        (STATUT_ACCEPTEE, "Acceptee"),
+        (STATUT_REFUSEE, "Refusee"),
     ]
 
     num = models.AutoField(primary_key=True)
-    # Hotel de rattachement. Indispensable des reception : une
-    # pseudo-reservation n'a ni chambre attribuee ni chambre demandee, et
-    # l'agent doit quand meme savoir de quel etablissement elle releve.
-    # PROTECT : supprimer un hotel supprimerait ses reservations.
     hotel = models.ForeignKey(
-        "hotels.Hotel",
+        Hotel,
         on_delete=models.PROTECT,
-        related_name="reservations",
+        related_name="demandes",
         db_column="hotel_id",
     )
     client = models.ForeignKey(
-        Client, on_delete=models.PROTECT, related_name="reservations", db_column="id_client"
-    )
-    # Chambre attribuee. Vide tant que la reservation est une
-    # pseudo-reservation en attente de validation par l'agent.
-    chambre = models.ForeignKey(
-        Chambre,
+        Client,
         on_delete=models.PROTECT,
-        related_name="reservations",
-        db_column="id_chambre",
-        null=True,
-        blank=True,
+        related_name="demandes",
+        db_column="id_client",
     )
-    # Chambre demandee par le client depuis le site. Conservee pour le suivi,
-    # meme si l'agent attribue une autre chambre au moment de la validation.
+    # SET_NULL : supprimer une chambre ne doit pas supprimer la demande,
+    # on garde la demande et on perd seulement le choix du client.
     chambre_demandee = models.ForeignKey(
         Chambre,
         on_delete=models.SET_NULL,
-        related_name="reservations_demandees",
+        related_name="demandes",
         null=True,
         blank=True,
     )
-    date_debut = models.DateField()
-    date_fin = models.DateField()
+    date_debut = models.DateTimeField(
+        help_text="Instant d'arrivee prevu (check-in de l'hotel si le client n'a pas precise l'heure).",
+    )
+    date_fin = models.DateTimeField(
+        help_text="Instant de depart prevu (check-out de l'hotel si le client n'a pas precise l'heure).",
+    )
+    nombreDePersonne = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     statut = models.CharField(
         max_length=20, choices=STATUT_CHOICES, default=STATUT_EN_ATTENTE
     )
-    nombreDePersonne = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     # Trace de la decision de l'agent. Renseignee par
-    # sync.services.valider_reservation(), jamais par le client du site.
+    # sync.services.valider_demande(), jamais par le client du site.
     date_decision = models.DateTimeField(null=True, blank=True)
     motif_refus = models.CharField(
         max_length=255,
         blank=True,
         help_text="Raison indiquee au client si l'agent refuse la demande.",
     )
-    # Curseur de synchronisation cote logiciel desktop : permet de ne
-    # renvoyer a l'agent que ce qui a bouge depuis sa derniere consultation.
-    #
     # `default=timezone.now` et non `auto_now_add=True` : les deux posent la
     # date a l'insertion, mais auto_now_add oblige Django a demander une
     # valeur pour les lignes deja presentes, ce qui bloque `makemigrations`
@@ -150,108 +213,186 @@ class Reservation(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        db_table = "demande"
+        ordering = ["date_debut"]
+        verbose_name = "Demande de chambre"
+        verbose_name_plural = "Demandes de chambres"
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(date_fin__gt=models.F("date_debut")),
+                name="demande_fin_apres_debut",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(nombreDePersonne__gte=1),
+                name="demande_min_une_personne",
+            ),
+        ]
+        indexes = [
+            # Requete la plus frequente de l'agent : la file d'attente, les
+            # plus anciennes d'abord.
+            models.Index(fields=["statut", "date_debut"], name="demande_statut_date_idx"),
+            models.Index(fields=["date_debut", "date_fin"], name="demande_dates_idx"),
+        ]
+
+    def _chambre_de_reference(self):
+        return self.chambre_demandee
+
+    def _nom_champ_chambre(self):
+        return "chambre_demandee"
+
+    def __str__(self):
+        return f"Demande #{self.num} - {self.client}"
+
+    @property
+    def est_en_attente(self):
+        return self.statut == self.STATUT_EN_ATTENTE
+
+    def valider(self, **kwargs):
+        """Raccourci vers sync.services.valider_demande()."""
+        from sync import services
+
+        return services.valider_demande(self, **kwargs)
+
+
+class Reservation(_ReglesMetier):
+    """
+    Reservation effective : une chambre est bloquee pour une plage d'instants.
+
+    `date_debut` et `date_fin` sont des DateTimeField, pas des dates : une
+    reservation se fait a une heure precise (l'heure de check-in de l'hotel
+    si le client n'en a pas donne, voir Hotel.heure_arrivee). C'est ce qui
+    permet de laisser la chambre a un client qui part a 11 h et a un autre
+    qui arrive a 15 h le meme jour, tout en refusant une arrivee a 22 h
+    un jour de depart.
+
+    N'existe QU'APRES acceptation d'une Demande par l'agent. `chambre` est
+    donc NOT NULL, et la regle "une reservation confirmee a toujours une
+    chambre" devient structurelle : plus aucune contrainte speciale n'est
+    necessaire, la colonne ne peut pas etre vide.
+
+    Foreign keys
+    ------------
+    * hotel        -> PROTECT : hotel de rattachement, verifie egalement
+      contre `chambre.hotel_id` (coherence 2).
+    * client       -> PROTECT : un client peut avoir plusieurs reservations.
+    * chambre      -> PROTECT : protege l'historique et les dates bloquees.
+    * demande      -> SET_NULL : la Demande a l'origine, si elle existe.
+    """
+
+    STATUT_CONFIRMEE = "confirmee"
+    STATUT_TERMINEE = "terminee"
+    STATUT_ANNULEE = "annulee"
+    STATUT_CHOICES = [
+        (STATUT_CONFIRMEE, "Confirmee"),
+        (STATUT_TERMINEE, "Terminee"),
+        (STATUT_ANNULEE, "Annulee"),
+    ]
+
+    num = models.AutoField(primary_key=True)
+    hotel = models.ForeignKey(
+        Hotel,
+        on_delete=models.PROTECT,
+        related_name="reservations",
+        db_column="hotel_id",
+    )
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.PROTECT,
+        related_name="reservations",
+        db_column="id_client",
+    )
+    chambre = models.ForeignKey(
+        Chambre,
+        on_delete=models.PROTECT,
+        related_name="reservations",
+        db_column="id_chambre",
+    )
+    demande = models.ForeignKey(
+        Demande,
+        on_delete=models.SET_NULL,
+        related_name="reservations",
+        null=True,
+        blank=True,
+        help_text="Demande du site web a l'origine de cette reservation.",
+    )
+    date_debut = models.DateTimeField(
+        help_text="Arrivee effective du client (check-in de l'hotel par defaut).",
+    )
+    date_fin = models.DateTimeField(
+        help_text="Depart effectif du client (check-out de l'hotel par defaut).",
+    )
+    nombreDePersonne = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    statut = models.CharField(
+        max_length=20, choices=STATUT_CHOICES, default=STATUT_CONFIRMEE
+    )
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
         db_table = "reservation"
         ordering = ["-date_debut"]
         constraints = [
-            # 1. La fin doit etre posterieure au debut. Ecrite en SQL pur
-            #    pour que SQLite ET PostgreSQL l'appliquent.
             models.CheckConstraint(
                 condition=models.Q(date_fin__gt=models.F("date_debut")),
                 name="reservation_fin_apres_debut",
             ),
-            # 2. Au moins une personne. Redondant avec MinValueValidator,
-            #    mais verrouille la regle au niveau base.
             models.CheckConstraint(
                 condition=models.Q(nombreDePersonne__gte=1),
                 name="reservation_min_une_personne",
             ),
-            # 3. Une reservation confirmee doit avoir une chambre attribuee.
-            #    Impose au niveau base qu'aucune reservation ne peut etre
-            #    confirmee sans chambre, meme par un INSERT en SQL brut.
-            models.CheckConstraint(
-                condition=(
-                    ~models.Q(statut__in=["confirmee", "terminee"])
-                    | models.Q(chambre__isnull=False)
-                ),
-                name="reservation_confirmee_avec_chambre",
-            ),
         ]
         indexes = [
-            # Requete la plus frequente de l'agent : les reservations en
-            # attente de validation, les plus anciennes d'abord.
             models.Index(fields=["statut", "date_debut"], name="reservation_statut_date_idx"),
-            # Requete de disponibilite : quelles chambres sont libres entre
-            # deux dates ?
             models.Index(fields=["date_debut", "date_fin"], name="reservation_dates_idx"),
         ]
 
-    def __str__(self):
-        if self.chambre_id:
-            return f"Reservation #{self.num} - {self.client} - {self.chambre}"
-        return f"Pseudo-reservation #{self.num} - {self.client} (chambre a attribuer)"
+    def _chambre_de_reference(self):
+        return self.chambre
 
-    @property
-    def est_pseudo_reservation(self):
-        """
-        Vrai tant qu'aucune chambre n'est attribuee : c'est la demande
-        emanant du site web, en attente de validation par l'agent.
-        """
-        return self.chambre_id is None
+    def _nom_champ_chambre(self):
+        return "chambre"
+
+    def __str__(self):
+        return f"Reservation #{self.num} - {self.client} - {self.chambre}"
 
     def clean(self):
-        # Regle 1 : ordering des dates.
-        if self.date_debut and self.date_fin and self.date_fin <= self.date_debut:
-            raise ValidationError(
-                {"date_fin": "La date de fin doit etre posterieure a la date de debut."}
-            )
+        super().clean()
+        self._verifier_pas_de_doublon()
 
-        # Regle 2 : la chambre demandee doit avoir assez de place. Verifie
-        # meme pour une pseudo-reservation, sinon l'agent decouvrirait le
-        # probleme au moment de la validation.
-        chambre_ref = self.chambre or self.chambre_demandee
-        capacite = None
-        if chambre_ref and chambre_ref.type_chambre:
-            capacite = chambre_ref.type_chambre.capacite
-        if capacite and self.nombreDePersonne > capacite:
+    def _verifier_pas_de_doublon(self):
+        """
+        Pas de double reservation sur la meme chambre.
+
+        Les dates etant des INSTANTS, la comparaison se fait a la minute
+        pres. Deux intervalles [a1,b1] et [a2,b2] se chevauchent si
+        a1 < b2 ET a2 < b1, bornes exclues : la chambre est libre entre
+        le depart de l'un et l'arrivee de l'autre.
+
+        Concretement, avec un check-out a 11 h et un check-in a 15 h :
+            - un client qui part le 5 a 11 h et un autre qui arrive le 5
+              a 15 h se succedent, c'est autorise ;
+            - un client qui arrive le 5 a 22 h, alors que la chambre est
+              encore occupee jusqu'a 11 h ce jour-la, est refuse.
+
+        Seules les reservations actives comptent : une reservation annulee
+        ou terminee ne bloque plus rien.
+        """
+        if not self.chambre_id or not self.date_debut or not self.date_fin:
+            return
+        conflits = Reservation.objects.filter(
+            chambre_id=self.chambre_id,
+            statut__in=[self.STATUT_CONFIRMEE, self.STATUT_TERMINEE],
+            date_debut__lt=self.date_fin,
+            date_fin__gt=self.date_debut,
+        )
+        if self.pk:
+            conflits = conflits.exclude(pk=self.pk)
+        if conflits.exists():
             raise ValidationError(
                 {
-                    "nombreDePersonne": (
-                        f"La chambre {chambre_ref.numero} accepte au maximum "
-                        f"{capacite} personne(s)."
+                    "chambre": (
+                        f"La chambre {self.chambre.numero} est deja reservee "
+                        f"sur une partie de cette plage de dates."
                     )
                 }
             )
-
-        # Regle 3 : pas de double reservation sur la meme chambre, meme si les
-        # dates sont differentes. Seules les reservations actives comptent.
-        # Deux intervalles [a1,b1] et [a2,b2] se chevauchent si
-        # a1 < b2 ET a2 < b1 (bornes exclues : une sortie le jour de
-        # l'entree d'un autre client reste possible).
-        # Sans chambre attribuee, il n'y a rien a verifier : c'est une
-        # pseudo-reservation, elle ne bloque encore aucune chambre.
-        if self.chambre_id and self.date_debut and self.date_fin:
-            conflits = Reservation.objects.filter(
-                chambre_id=self.chambre_id,
-                statut__in=[self.STATUT_EN_ATTENTE, self.STATUT_CONFIRMEE],
-                date_debut__lt=self.date_fin,
-                date_fin__gt=self.date_debut,
-            )
-            if self.pk:
-                # Ignore la reservation en cours de modification.
-                conflits = conflits.exclude(pk=self.pk)
-            if conflits.exists():
-                raise ValidationError(
-                    {
-                        "chambre": (
-                            f"La chambre {self.chambre.numero} est deja reservee "
-                            f"sur une partie de cette plage de dates."
-                        )
-                    }
-                )
-
-    def save(self, *args, **kwargs):
-        # Django n'appelle clean() que depuis un ModelForm. On le branche
-        # ici pour que la regle de gestion s'applique aussi quand du code
-        # appelle reservation.save() directement.
-        self.full_clean()
-        super().save(*args, **kwargs)

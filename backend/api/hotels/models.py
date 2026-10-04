@@ -1,3 +1,5 @@
+from datetime import time as Heure
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
@@ -10,8 +12,16 @@ class Hotel(models.Model):
     l'application `hotels` y est rattache.
     """
 
+    # Heures de reference de l'etablissement. Une reservation porte des
+    # instants precis (voir reservations.models.DateTimeField) : ces deux
+    # heures servent de valeur par defaut quand le client ne donne qu'une
+    # date -- ce qui est le cas du site public, ou le formulaire ne propose
+    # que deux dates.
+    HEURE_ARRIVEE_DEFAUT = Heure(15, 0)
+    HEURE_DEPART_DEFAUT = Heure(11, 0)
+
     hotel_id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=150)
+    nom = models.CharField(max_length=150)
     adresse = models.CharField(max_length=255)
     ville = models.CharField(max_length=100)
     tel = models.CharField(max_length=30)
@@ -23,16 +33,33 @@ class Hotel(models.Model):
     # l'hotel. NE PAS utiliser ce champ comme reference de verite, la source
     # de verite est Hotel.chambres.count() (voir nombre_chambres_reel).
     nombre_chambres = models.PositiveIntegerField(validators=[MinValueValidator(0)])
+    heure_arrivee = models.TimeField(
+        default=HEURE_ARRIVEE_DEFAUT,
+        help_text="Heure de check-in : heure d'arrivee retenue quand le client ne precise pas l'heure.",
+    )
+    heure_depart = models.TimeField(
+        default=HEURE_DEPART_DEFAUT,
+        help_text="Heure de check-out : heure de depart retenue quand le client ne precise pas l'heure.",
+    )
 
     class Meta:
         db_table = "hotel"
 
     def __str__(self):
-        return self.name
+        return self.nom
 
     def nombre_chambres_reel(self):
         """Nombre de chambres effectivement enregistrees."""
         return self.chambres.count()
+
+    @property
+    def name(self):
+        """Alias pour 'nom' afin de satisfaire les references externes."""
+        return self.nom
+
+    @name.setter
+    def name(self, value):
+        self.nom = value
 
 
 class TypeDeChambre(models.Model):
@@ -108,7 +135,7 @@ class Chambre(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.hotel.name} - Chambre {self.numero}"
+        return f"{self.hotel.nom} - Chambre {self.numero}"
 
     def clean(self):
         # L'etage ne peut pas depasser la hauteur de l'hotel.
@@ -132,14 +159,23 @@ class Chambre(models.Model):
 
 class Personnel(models.Model):
     """
-    Membre du personnel rattache a un hotel et, optionnellement, a un compte
-    User (un employe peut travailler sans avoir de compte technique).
+    Membre du personnel de l'hotel, rattache a un compte technique.
+
+    Regle metier : « a chaque hotel ses employes ». L'employe EST le compte.
+    Donc Personnel ne porte plus ni `hotel` ni `nom`/`prenom` -- ces
+    informations viennent de User, ce qui supprime la possibilite qu'un
+    compte et sa fiche soient desynchronises.
+
+        - hotel  : lu via user.hotel_id
+        - nom     : lu via user.last_name
+        - prenom  : lu via user.first_name
 
     Foreign keys
     ------------
-    * user  -> settings.AUTH_USER_MODEL, SET_NULL : supprimer un compte ne
-               doit pas supprimer la fiche employe. Relation 1-1.
-    * hotel -> CASCADE : le personnel n'existe pas hors de son hotel.
+    * user -> settings.AUTH_USER_MODEL, PROTECT, OneToOne, NOT NULL.
+      PROTECT : on ne peut pas supprimer le compte d'un employe en
+      activity. SET_NULL aurait permis de laisser un employe sans compte,
+      ce qui recreait exactement l'incoherence qu'on supprime ici.
     """
 
     SEXE_M = "M"
@@ -149,23 +185,41 @@ class Personnel(models.Model):
     matricule = models.AutoField(primary_key=True)
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
+        on_delete=models.PROTECT,
         related_name="personnel",
         db_column="id_user",
-        help_text="Compte Hypnos lie a ce membre du personnel (optionnel).",
+        help_text="Compte Hypnos de cet employe.",
     )
-    hotel = models.ForeignKey(
-        Hotel, on_delete=models.CASCADE, related_name="personnel", db_column="hotel_id"
-    )
-    nom = models.CharField(max_length=100)
-    prenom = models.CharField(max_length=100)
     sexe = models.CharField(max_length=1, choices=SEXE_CHOICES)
     poste = models.CharField(max_length=100)
 
     class Meta:
         db_table = "personnel"
+        indexes = [
+            models.Index(fields=["poste"], name="personnel_poste_idx"),
+        ]
 
     def __str__(self):
-        return f"{self.prenom} {self.nom}"
+        return f"{self.prenom} {self.nom} ({self.poste})"
+
+    # -- proprietes de lecture -------------------------------------------------
+    # Elles rendent le code et les templates lisibles. ATTENTION : une
+    # propriete n'existe pas en SQL, donc en cas de REQUETE il faut passer
+    # par la relation : Personnel.objects.filter(user__hotel=X), jamais
+    # Personnel.objects.filter(hotel=X).
+
+    @property
+    def hotel(self):
+        return self.user.hotel
+
+    @property
+    def hotel_id(self):
+        return self.user.hotel_id
+
+    @property
+    def nom(self):
+        return self.user.last_name
+
+    @property
+    def prenom(self):
+        return self.user.first_name
