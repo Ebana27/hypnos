@@ -6,6 +6,7 @@ import { and, eq, gt, inArray, lt, ne, or, sql, getTableColumns } from 'drizzle-
 import { migrate } from 'drizzle-orm/libsql/migrator'
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'crypto'
 import { promisify } from 'util'
+import electronUpdater from 'electron-updater'
 
 import { getDb } from './db/client.js'
 import {
@@ -20,6 +21,9 @@ import {
   typeDeChambre,
   user
 } from './db/schema/schema.js'
+
+// electron-updater est publié en CommonJS : on passe par l'export par défaut
+const { autoUpdater } = electronUpdater
 
 let onloadingWindow = null // écran de chargement (compteur)
 let setupWindow = null // présentation + création de l'hôtel (premier lancement)
@@ -120,6 +124,13 @@ function createWindow() {
   loadRenderer(mainWindow)
 }
 
+// Ouvre la fenêtre principale (si besoin) et démarre la surveillance des mises à jour
+function ouvrirFenetrePrincipale() {
+  if (mainWindow) return
+  createWindow()
+  initialiserMisesAJour()
+}
+
 // ---------- Contrôles de fenêtre (barre de titre personnalisée) ----------
 ipcMain.on('window:minimize', (e) => BrowserWindow.fromWebContents(e.sender)?.minimize())
 ipcMain.on('window:close', (e) => BrowserWindow.fromWebContents(e.sender)?.close())
@@ -147,12 +158,12 @@ ipcMain.on('onloading:done', async () => {
 })
 ipcMain.on('setup:done', () => {
   if (!session) return // pas de fenêtre principale sans compte
-  if (!mainWindow) createWindow()
+  ouvrirFenetrePrincipale()
   if (setupWindow) setupWindow.close()
 })
 ipcMain.on('login:done', () => {
   if (!session) return
-  if (!mainWindow) createWindow()
+  ouvrirFenetrePrincipale()
   if (loginWindow) loginWindow.close()
 })
 
@@ -203,7 +214,7 @@ async function initialiserBase() {
 class ErreurMetier extends Error {}
 
 const MESSAGES_CONTRAINTES = {
-  hotel_etages_min: "Un hôtel doit avoir au moins 1 étage.",
+  hotel_etages_min: 'Un hôtel doit avoir au moins 1 étage.',
   hotel_chambres_min: 'Le nombre de chambres ne peut pas être négatif.',
   type_prix_min: 'Le prix ne peut pas être négatif.',
   type_capacite_min: 'La capacité doit être d’au moins 1 personne.',
@@ -477,7 +488,7 @@ function validerCreation(d) {
   return {
     nom, ville, adresse: texte(d?.adresse), tel: texte(d?.tel),
     etagesHauts, chambresParEtage, chambresRez, tarif, arrivee, depart,
-    prenom, nomFamille, email, motDePasse, 
+    prenom, nomFamille, email, motDePasse
   }
 }
 
@@ -512,18 +523,6 @@ enregistrer(
         .values({ label: 'Standard', prix: p.tarif, capacite: 2 })
         .returning()
 
-      // const chambres = []
-      // for (let niveau = 0; niveau < niveaux; niveau++) {
-      //   for (let i = 1; i <= p.chambresParEtage; i++) {
-      //     chambres.push({
-      //       typeId: type.id,
-      //       numero: numeroChambre(niveau, i),
-      //       etage: niveau,
-      //       statut: 'disponible'
-      //     })
-      //   }
-      // }
-      // await tx.insert(chambre).values(chambres)
       await tx.insert(chambre).values(
         plan.map(({ numero, etage }) => ({
           typeId: type.id,
@@ -617,6 +616,87 @@ enregistrer('session:courante', async () => {
 //     role: 'administrateur'
 //   })
 // }
+
+// ============================================================
+//  MISES À JOUR (GitHub Releases, dépôt « hypnos-update-history »)
+//  La publication se fait au git tag (voir .github/workflows/release.yml).
+//  L'état est envoyé à la fenêtre principale : la barre de titre l'affiche.
+// ============================================================
+
+// aucune | verification | disponible | telechargement | prete | erreur
+let etatMaj = { etat: 'aucune' }
+let majInitialisee = false
+
+function diffuserMaj(nouvelEtat) {
+  etatMaj = nouvelEtat
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('maj:etat', etatMaj)
+  }
+}
+
+function initialiserMisesAJour() {
+  if (majInitialisee) return
+  majInitialisee = true
+
+  // En développement, aucune vérification réelle (l'application n'est pas installée).
+  // Pour tester l'affichage de la barre de titre : HYPNOS_MAJ_TEST=1 npm run dev
+  if (is.dev) {
+    if (process.env['HYPNOS_MAJ_TEST']) {
+      setTimeout(() => diffuserMaj({ etat: 'disponible', version: '9.9.9' }), 3000)
+    }
+    return
+  }
+
+  autoUpdater.autoDownload = false // l'utilisateur décide du téléchargement
+  autoUpdater.autoInstallOnAppQuit = true // installée à la fermeture si déjà téléchargée
+
+  autoUpdater.on('checking-for-update', () => diffuserMaj({ etat: 'verification' }))
+  autoUpdater.on('update-not-available', () => diffuserMaj({ etat: 'aucune' }))
+  autoUpdater.on('update-available', (info) =>
+    diffuserMaj({ etat: 'disponible', version: info.version })
+  )
+  autoUpdater.on('download-progress', (p) =>
+    diffuserMaj({ etat: 'telechargement', pourcent: Math.round(p.percent) })
+  )
+  autoUpdater.on('update-downloaded', (info) =>
+    diffuserMaj({ etat: 'prete', version: info.version })
+  )
+  autoUpdater.on('error', (e) => {
+    // Hors connexion ou dépôt injoignable : on ne dérange pas l'utilisateur
+    console.error('Mise à jour :', e)
+    diffuserMaj({ etat: 'erreur' })
+  })
+
+  const verifier = () => autoUpdater.checkForUpdates().catch(() => {})
+  verifier()
+  setInterval(verifier, 4 * 60 * 60 * 1000) // puis toutes les 4 heures
+}
+
+enregistrer('maj:etat', async () => etatMaj)
+
+enregistrer('maj:verifier', async () => {
+  if (is.dev) return etatMaj
+  // Ne relance pas une vérification pendant un téléchargement ou si la mise à jour est prête
+  if (etatMaj.etat === 'telechargement' || etatMaj.etat === 'prete') return etatMaj
+  await autoUpdater.checkForUpdates()
+  return etatMaj
+})
+
+enregistrer('maj:telecharger', async () => {
+  if (is.dev) throw new ErreurMetier('Les mises à jour sont désactivées en développement.')
+  if (etatMaj.etat !== 'disponible') throw new ErreurMetier('Aucune mise à jour à télécharger.')
+  diffuserMaj({ etat: 'telechargement', pourcent: 0 })
+  await autoUpdater.downloadUpdate()
+  return { success: true }
+})
+
+enregistrer('maj:installer', async () => {
+  if (is.dev) throw new ErreurMetier('Les mises à jour sont désactivées en développement.')
+  if (etatMaj.etat !== 'prete') throw new ErreurMetier("La mise à jour n'est pas encore téléchargée.")
+  // (silencieux = false, relancer après installation = true)
+  setImmediate(() => autoUpdater.quitAndInstall(false, true))
+  return { success: true }
+})
 
 // ============================================================
 //  CYCLE DE VIE DE L'APPLICATION

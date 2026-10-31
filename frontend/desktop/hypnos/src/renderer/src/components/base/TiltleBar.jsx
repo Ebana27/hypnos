@@ -4,63 +4,72 @@ import logoHypnos from '../../assets/images/logotype.png'
 
 // ============================================================
 //  STYLE (intégré au composant)
-//  Les effets de survol sont dans le CSS : les styles en ligne
-//  ne gèrent pas :hover (l'ancien « ':hover': red » était ignoré).
+//  Les styles en ligne ne gèrent pas :hover : le survol est dans CSS_SURVOL.
 // ============================================================
-const STYLES = `
-.titlebar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 52px;
-  background: transparent;
-  color: var(--color-text);
-  user-select: none;
-  -webkit-app-region: drag; /* toute la barre déplace la fenêtre */
+
+const STYLES = {
+  barre: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: '52px',
+    background: 'transparent',
+    color: 'var(--color-text)',
+    userSelect: 'none',
+    WebkitAppRegion: 'drag'
+  },
+  logo: { display: 'block', paddingLeft: '28px', WebkitAppRegion: 'no-drag' },
+  logoImage: { display: 'block', width: '120px' },
+  droite: { display: 'flex', alignItems: 'center', gap: '12px' },
+  controles: { display: 'flex', alignItems: 'center' },
+  bouton: {
+    display: 'grid',
+    placeItems: 'center',
+    width: '52px',
+    height: '42px',
+    border: 'none',
+    background: 'transparent',
+    color: 'inherit',
+    cursor: 'pointer',
+    WebkitAppRegion: 'no-drag'
+  },
+  maj: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '4px 12px',
+    borderRadius: '999px',
+    border: 'none',
+    background: 'var(--hypnos-medium-blue, #141cc5)',
+    color: '#fff',
+    fontSize: '12px',
+    cursor: 'pointer',
+    WebkitAppRegion: 'no-drag'
+  },
+  piste: {
+    width: '60px',
+    height: '4px',
+    borderRadius: '2px',
+    background: 'rgba(255, 255, 255, 0.3)',
+    overflow: 'hidden'
+  },
+  remplissage: { height: '100%', background: '#fff', transition: 'width 0.2s' }
 }
 
-/* Les éléments cliquables doivent sortir de la zone de déplacement */
-.titlebar__logo {
-  display: block;
-  padding-left: 28px;
-  -webkit-app-region: no-drag;
-}
-.titlebar__logo img {
-  display: block;
-  width: 120px;
-}
-
-.titlebar__controles {
-  display: flex;
-  align-items: center;
-}
-.titlebar__bouton {
-  display: grid;
-  place-items: center;
-  width: 52px;
-  height: 42px;
-  border: none;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  -webkit-app-region: no-drag;
-}
-.titlebar__bouton:hover {
-  background: var(--color-accent-wash);
-}
-.titlebar__bouton--fermer:hover {
-  background: var(--color-danger);
-  color: var(--color-accent-contrast);
-}
+const CSS_SURVOL = `
+  .titlebar__bouton:hover { background: var(--color-accent-wash); }
+  .titlebar__bouton--fermer:hover {
+    background: var(--color-danger);
+    color: var(--color-accent-contrast);
+  }
 `
 
-// Le processus principal n'expose pas l'état « agrandie » : on le déduit de la
-// taille de la fenêtre par rapport à l'écran (zone utile, hors barre des tâches).
+// Le processus principal n'expose pas l'état « agrandie » : on le déduit de la taille de la fenêtre.
 function estAgrandie() {
   return (
     window.outerWidth >= window.screen.availWidth &&
@@ -68,59 +77,101 @@ function estAgrandie() {
   )
 }
 
+function IndicateurMaj({ maj }) {
+  if (maj.etat === 'disponible') {
+    return (
+      <button type="button" style={STYLES.maj} onClick={() => window.api.maj.telecharger()}>
+        Mise à jour {maj.version} disponible : télécharger
+      </button>
+    )
+  }
+  if (maj.etat === 'telechargement') {
+    return (
+      <div style={STYLES.maj}>
+        Téléchargement… {maj.pourcent}%
+        <div style={STYLES.piste}>
+          <div style={{ ...STYLES.remplissage, width: `${maj.pourcent}%` }} />
+        </div>
+      </div>
+    )
+  }
+  if (maj.etat === 'prete') {
+    return (
+      <button type="button" style={STYLES.maj} onClick={() => window.api.maj.installer()}>
+        Redémarrer pour installer la version {maj.version}
+      </button>
+    )
+  }
+  return null
+}
+
 export default function TiltleBar() {
   const [agrandie, setAgrandie] = useState(estAgrandie)
+  const [maj, setMaj] = useState({ etat: 'aucune' })
 
   useEffect(() => {
-    const miseAJour = () => setAgrandie(estAgrandie())
-    window.addEventListener('resize', miseAJour)
-    return () => window.removeEventListener('resize', miseAJour)
+    const surRedimensionnement = () => setAgrandie(estAgrandie())
+    window.addEventListener('resize', surRedimensionnement)
+    return () => window.removeEventListener('resize', surRedimensionnement)
+  }, [])
+
+  useEffect(() => {
+    // État actuel (au cas où l'événement serait parti avant l'affichage), puis les changements
+    window.api.maj.etat().then(setMaj).catch(() => {})
+    return window.api.maj.surChangement(setMaj)
   }, [])
 
   const libelleAgrandir = agrandie ? 'Restaurer' : 'Agrandir'
 
   return (
-    <header className="titlebar">
-      <style>{STYLES}</style>
+    <header className="titlebar" style={STYLES.barre}>
+      <style>{CSS_SURVOL}</style>
 
-      {/* target="_blank" : le lien s'ouvre dans le navigateur, sans remplacer l'application */}
       <a
         className="titlebar__logo"
+        style={STYLES.logo}
         href="https://www.hypnos.space/"
         target="_blank"
         rel="noreferrer"
       >
-        <img src={logoHypnos} alt="Hypnos" />
+        <img src={logoHypnos} alt="Hypnos" style={STYLES.logoImage} />
       </a>
 
-      <div className="titlebar__controles">
-        <button
-          type="button"
-          className="titlebar__bouton"
-          onClick={() => window.api.minimize()}
-          aria-label="Réduire"
-          title="Réduire"
-        >
-          <Minus size={16} />
-        </button>
-        <button
-          type="button"
-          className="titlebar__bouton"
-          onClick={() => window.api.maximize()}
-          aria-label={libelleAgrandir}
-          title={libelleAgrandir}
-        >
-          {agrandie ? <Copy size={14} /> : <Square size={14} />}
-        </button>
-        <button
-          type="button"
-          className="titlebar__bouton titlebar__bouton--fermer"
-          onClick={() => window.api.close()}
-          aria-label="Fermer"
-          title="Fermer"
-        >
-          <X size={16} />
-        </button>
+      <div style={STYLES.droite}>
+        <IndicateurMaj maj={maj} />
+
+        <div className="titlebar__controles" style={STYLES.controles}>
+          <button
+            type="button"
+            className="titlebar__bouton"
+            style={STYLES.bouton}
+            onClick={() => window.api.minimize()}
+            aria-label="Réduire"
+            title="Réduire"
+          >
+            <Minus size={16} />
+          </button>
+          <button
+            type="button"
+            className="titlebar__bouton"
+            style={STYLES.bouton}
+            onClick={() => window.api.maximize()}
+            aria-label={libelleAgrandir}
+            title={libelleAgrandir}
+          >
+            {agrandie ? <Copy size={14} /> : <Square size={14} />}
+          </button>
+          <button
+            type="button"
+            className="titlebar__bouton titlebar__bouton--fermer"
+            style={STYLES.bouton}
+            onClick={() => window.api.close()}
+            aria-label="Fermer"
+            title="Fermer"
+          >
+            <X size={16} />
+          </button>
+        </div>
       </div>
     </header>
   )

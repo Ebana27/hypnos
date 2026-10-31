@@ -42,13 +42,27 @@ const api = {
   onloadingDone: () => ipcRenderer.send('onloading:done'),
   finishonloading: () => ipcRenderer.send('onloading:done'),
   loginDone: () => ipcRenderer.send('login:done'),
-  
+  setupDone: () => ipcRenderer.send('setup:done'),
+
   // -------- Accès --------
   connexion: (identifiant, motDePasse) => appeler('auth:connexion', identifiant, motDePasse),
   creerHotel: (donnees) => appeler('hotel:creerComplet', donnees),
   sessionCourante: () => appeler('session:courante'),
-  setupDone: () => ipcRenderer.send('setup:done'),
 
+  // -------- Mises à jour --------
+  // États possibles : aucune | verification | disponible | telechargement | prete | erreur
+  maj: {
+    etat: () => appeler('maj:etat'),
+    verifier: () => appeler('maj:verifier'),
+    telecharger: () => appeler('maj:telecharger'),
+    installer: () => appeler('maj:installer'),
+    // Renvoie une fonction de désinscription (à appeler dans le nettoyage de useEffect)
+    surChangement: (rappel) => {
+      const ecouteur = (_event, etat) => rappel(etat)
+      ipcRenderer.on('maj:etat', ecouteur)
+      return () => ipcRenderer.removeListener('maj:etat', ecouteur)
+    }
+  },
 
   // -------- CRUD générique --------
   getAll: async (table) => {
