@@ -20,27 +20,17 @@
   "build": {
     "appId": "com.hypnos.app",
     "productName": "Hypnos",
-    "asarUnpack": [
-      "resources/**",
-      "node_modules/@libsql/**"
-    ],
-    "extraResources": [
-      {
-        "from": "drizzle",
-        "to": "drizzle"
-      }
-    ],
+    "compression": "maximum",
+    "electronLanguages": ["fr", "en-US"],
+    "files": ["out/**/*", "resources/**/*"],
+    "asarUnpack": ["resources/**", "node_modules/@libsql/**"],
+    "extraResources": [{ "from": "drizzle", "to": "drizzle" }],
     "win": {
       "icon": "./resources/icon.png",
-      "target": "nsis"
+      "target": [{ "target": "nsis", "arch": ["x64"] }]
     },
     "publish": [
-      {
-        "provider": "github",
-        "owner": "Ebana27",
-        "repo": "hypnos-update-history",
-        "releaseType": "release"
-      }
+      { "provider": "github", "owner": "Ebana27", "repo": "hypnos-update-history", "releaseType": "release" }
     ]
   },
   "dependencies": {
