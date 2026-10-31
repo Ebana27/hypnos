@@ -1,8 +1,10 @@
 appId: com.hypnos.app
-productName: hypnos
+# Ne plus changer ce nom après la première installation : Electron s'en sert
+# pour nommer le dossier des données (la base locale de l'utilisateur).
+productName: Hypnos
 directories:
-  # resources/icon.png (1025x1025) sert d'icone : electron-builder le
-  # convertit en .ico pour Windows et en .icns pour macOS.
+  # resources/icon.png sert d'icône : electron-builder la convertit
+  # en .ico pour Windows et en .icns pour macOS.
   buildResources: resources
 files:
   - '!**/.vscode/*'
@@ -10,11 +12,24 @@ files:
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!verifier-imports.mjs'
+  - '!local.db*'
+  - '!drizzle.config.*'
+  # Les migrations sont copiées à part (extraResources) : inutile de les mettre aussi dans l'archive
+  - '!drizzle/**'
 asarUnpack:
   - resources/**
+  - node_modules/@libsql/**
+extraResources:
+  - from: drizzle
+    to: drizzle
 win:
   executableName: hypnos
   icon: resources/icon.png
+  target:
+    - target: nsis
+      arch:
+        - x64
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
@@ -22,28 +37,25 @@ nsis:
   createDesktopShortcut: always
 mac:
   icon: resources/icon.png
+  category: public.app-category.business
   entitlementsInherit: resources/entitlements.mac.plist
+  target:
+    # Le .zip est nécessaire aux mises à jour automatiques sur macOS
+    - dmg
+    - zip
   extendInfo:
-    - NSCameraUsageDescription: Application requests access to the device's camera.
-    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
 dmg:
   artifactName: ${name}-${version}.${ext}
-linux:
-  icon: resources/icon.png
-  target:
-    - AppImage
-    - snap
-    - deb
-  maintainer: electronjs.org
-  category: Utility
-appImage:
-  artifactName: ${name}-${version}.${ext}
 npmRebuild: false
+compression: maximum
+electronLanguages:
+  - fr
+  - en-US
 publish:
-  provider: generic
-  url: https://example.com/auto-updates
-electronDownload:
-  mirror: https://npmmirror.com/mirrors/electron/
+  provider: github
+  owner: Ebana27
+  repo: hypnos-update-history
+  releaseType: release

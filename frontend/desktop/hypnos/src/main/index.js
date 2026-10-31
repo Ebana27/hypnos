@@ -6,7 +6,6 @@ import { and, eq, gt, inArray, lt, ne, or, sql, getTableColumns } from 'drizzle-
 import { migrate } from 'drizzle-orm/libsql/migrator'
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'crypto'
 import { promisify } from 'util'
-import electronUpdater from 'electron-updater'
 
 import { getDb } from './db/client.js'
 import {
@@ -22,8 +21,8 @@ import {
   user
 } from './db/schema/schema.js'
 
-// electron-updater est publié en CommonJS : on passe par l'export par défaut
-const { autoUpdater } = electronUpdater
+// electron-updater n'est PAS importé ici : il est chargé à la demande (voir chargerUpdater),
+// uniquement dans l'application installée, pour ne pas ralentir le démarrage.
 
 let onloadingWindow = null // écran de chargement (compteur)
 let setupWindow = null // présentation + création de l'hôtel (premier lancement)
@@ -33,6 +32,16 @@ let session = null // { userId } de la personne connectée
 
 const db = getDb()
 const scrypt = promisify(scryptCallback)
+
+// ============================================================
+//  MESURE DU DÉMARRAGE (développement uniquement)
+//  Affiche dans le terminal le temps écoulé depuis le lancement du processus.
+// ============================================================
+
+function journal(etape) {
+  if (!is.dev) return
+  console.log(`[démarrage] ${etape} : ${Math.round(process.uptime() * 1000)} ms`)
+}
 
 async function hotelExiste() {
   const lignes = await db.select({ id: hotel.id }).from(hotel).limit(1)
@@ -91,22 +100,50 @@ function creerFenetre(options) {
 // Fenêtres fixes (onloading, connexion)
 const FENETRE_FIXE = { resizable: false, maximizable: false, fullscreenable: false }
 
+// Résolu quand la fenêtre a fini de se préparer (ou après 8 s au plus : on n'attend jamais indéfiniment)
+function attendreAffichage(win) {
+  return new Promise((resolve) => {
+    if (win.isDestroyed() || win.isVisible()) return resolve()
+    const fin = () => resolve()
+    win.once('ready-to-show', fin)
+    win.webContents.once('did-fail-load', fin)
+    setTimeout(fin, 8000)
+  })
+}
+
+// Fermer l'écran de chargement avant la fin du parcours quitte l'application :
+// sinon la fenêtre suivante, préparée masquée, garderait le processus en vie sans rien afficher.
+let chargementTermine = false
+
 function createOnloadingWindow() {
   onloadingWindow = creerFenetre({ width: 720, height: 300, ...FENETRE_FIXE })
   loadRenderer(onloadingWindow, 'onloading')
-  onloadingWindow.on('closed', () => { onloadingWindow = null })
+  onloadingWindow.once('ready-to-show', () => journal('écran de chargement affiché'))
+  onloadingWindow.on('closed', () => {
+    onloadingWindow = null
+    if (!chargementTermine) app.quit()
+  })
 }
 
+// Préparée masquée pendant le compteur, affichée par « onloading:done »
 function createSetupWindow() {
-  setupWindow = creerFenetre({ width: 1000, height: 650, ...FENETRE_FIXE })
+  setupWindow = creerFenetre({ width: 1000, height: 650, show: false, ...FENETRE_FIXE })
   loadRenderer(setupWindow, 'onboarding')
   setupWindow.on('closed', () => { setupWindow = null })
+  return setupWindow
 }
 
 function createLoginWindow() {
-  loginWindow = creerFenetre({ width: 1000, height: 650, ...FENETRE_FIXE })
+  loginWindow = creerFenetre({ width: 1000, height: 650, show: false, ...FENETRE_FIXE })
   loadRenderer(loginWindow, 'login')
   loginWindow.on('closed', () => { loginWindow = null })
+  return loginWindow
+}
+
+// La fenêtre de connexion / création reste visible jusqu'à ce que la principale soit prête
+function fermerFenetresAcces() {
+  if (loginWindow) loginWindow.close()
+  if (setupWindow) setupWindow.close()
 }
 
 function createWindow() {
@@ -119,7 +156,12 @@ function createWindow() {
     fullscreenable: true,
     show: false
   })
-  mainWindow.on('ready-to-show', () => { mainWindow.maximize(); mainWindow.show() })
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.maximize()
+    mainWindow.show()
+    fermerFenetresAcces()
+    journal('fenêtre principale affichée')
+  })
   mainWindow.on('closed', () => { mainWindow = null })
   loadRenderer(mainWindow)
 }
@@ -127,8 +169,9 @@ function createWindow() {
 // Ouvre la fenêtre principale (si besoin) et démarre la surveillance des mises à jour
 function ouvrirFenetrePrincipale() {
   if (mainWindow) return
+  journal('ouverture de la fenêtre principale demandée')
   createWindow()
-  initialiserMisesAJour()
+  initialiserMisesAJour().catch((e) => console.error('Mise à jour :', e))
 }
 
 // ---------- Contrôles de fenêtre (barre de titre personnalisée) ----------
@@ -141,30 +184,75 @@ ipcMain.on('window:maximize', (e) => {
   else win.maximize()
 })
 
-// ---------- Enchaînement : chargement → (présentation + création | connexion) → application ----------
-ipcMain.on('onloading:done', async () => {
+// ============================================================
+//  PARCOURS DE DÉMARRAGE
+//  chargement → (présentation + création | connexion) → application
+//
+//  Pendant que le compteur s'affiche, on prépare déjà la suite :
+//  migrations, vérification de l'hôtel, création MASQUÉE de la fenêtre suivante.
+//  À la fin du compteur, il ne reste qu'à l'afficher.
+// ============================================================
+
+let basePromise = null // Promise<boolean> : la base est-elle prête ?
+let suitePreparee = null // Promise<{ fenetre, affichable } | null>
+
+async function preparerSuite() {
+  const prete = await basePromise
+  journal(`base de données ${prete ? 'prête' : 'en échec'}`)
+
+  // Application installée sans base utilisable : on la ferme.
+  // En développement on continue pour pouvoir corriger sans tout relancer.
+  if (!prete && app.isPackaged) {
+    app.quit()
+    return null
+  }
+
+  let hotelPresent = true // en cas d'erreur, on passe par la connexion
   try {
-    if (await hotelExiste()) {
-      if (!loginWindow) createLoginWindow()
-    } else if (!setupWindow) {
-      createSetupWindow()
+    hotelPresent = await hotelExiste()
+  } catch (e) {
+    console.error(e)
+  }
+  journal('hôtel vérifié')
+
+  const fenetre = hotelPresent
+    ? (loginWindow ?? createLoginWindow())
+    : (setupWindow ?? createSetupWindow())
+  return { fenetre, affichable: attendreAffichage(fenetre) }
+}
+
+function demarrerParcours() {
+  chargementTermine = false
+  createOnloadingWindow()
+  suitePreparee = preparerSuite()
+}
+
+ipcMain.on('onloading:done', async () => {
+  if (chargementTermine) return
+  chargementTermine = true
+  try {
+    const suite = await suitePreparee
+    if (suite && !suite.fenetre.isDestroyed()) {
+      await suite.affichable
+      suite.fenetre.show()
+      suite.fenetre.focus()
     }
   } catch (e) {
     console.error(e)
-    if (!loginWindow) createLoginWindow()
   }
-  // On ferme le chargement après avoir ouvert la suite, sinon l'application s'arrêterait
+  journal('fenêtre de connexion / création affichée')
+  // On ferme le chargement après avoir affiché la suite, sinon l'application s'arrêterait
   if (onloadingWindow) onloadingWindow.close()
 })
+
 ipcMain.on('setup:done', () => {
   if (!session) return // pas de fenêtre principale sans compte
   ouvrirFenetrePrincipale()
-  if (setupWindow) setupWindow.close()
 })
+
 ipcMain.on('login:done', () => {
   if (!session) return
   ouvrirFenetrePrincipale()
-  if (loginWindow) loginWindow.close()
 })
 
 // ============================================================
@@ -621,11 +709,24 @@ enregistrer('session:courante', async () => {
 //  MISES À JOUR (GitHub Releases, dépôt « hypnos-update-history »)
 //  La publication se fait au git tag (voir .github/workflows/release.yml).
 //  L'état est envoyé à la fenêtre principale : la barre de titre l'affiche.
+//  La vérification démarre dès l'ouverture de la fenêtre principale.
 // ============================================================
 
 // aucune | verification | disponible | telechargement | prete | erreur
 let etatMaj = { etat: 'aucune' }
-let majInitialisee = false
+let majPromise = null // démarrage unique (évite les doubles écouteurs et le double minuteur)
+let updater = null
+
+// electron-updater est chargé à la demande : jamais en développement, et en parallèle du
+// chargement de la fenêtre principale dans l'application installée.
+async function chargerUpdater() {
+  if (updater) return updater
+  const module = await import('electron-updater')
+  // Selon la façon dont le paquet est empaqueté, l'objet est à la racine ou dans « default »
+  updater = module.autoUpdater ?? module.default?.autoUpdater
+  if (!updater) throw new Error("Module de mise à jour introuvable.")
+  return updater
+}
 
 function diffuserMaj(nouvelEtat) {
   etatMaj = nouvelEtat
@@ -634,42 +735,42 @@ function diffuserMaj(nouvelEtat) {
   }
 }
 
-function initialiserMisesAJour() {
-  if (majInitialisee) return
-  majInitialisee = true
-
+async function demarrerMisesAJour() {
   // En développement, aucune vérification réelle (l'application n'est pas installée).
   // Pour tester l'affichage de la barre de titre : HYPNOS_MAJ_TEST=1 npm run dev
   if (is.dev) {
     if (process.env['HYPNOS_MAJ_TEST']) {
       setTimeout(() => diffuserMaj({ etat: 'disponible', version: '9.9.9' }), 3000)
     }
-    return
+    return null
   }
 
-  autoUpdater.autoDownload = false // l'utilisateur décide du téléchargement
-  autoUpdater.autoInstallOnAppQuit = true // installée à la fermeture si déjà téléchargée
+  const u = await chargerUpdater()
+  u.autoDownload = false // l'utilisateur décide du téléchargement
+  u.autoInstallOnAppQuit = true // installée à la fermeture si déjà téléchargée
 
-  autoUpdater.on('checking-for-update', () => diffuserMaj({ etat: 'verification' }))
-  autoUpdater.on('update-not-available', () => diffuserMaj({ etat: 'aucune' }))
-  autoUpdater.on('update-available', (info) =>
-    diffuserMaj({ etat: 'disponible', version: info.version })
-  )
-  autoUpdater.on('download-progress', (p) =>
+  u.on('checking-for-update', () => diffuserMaj({ etat: 'verification' }))
+  u.on('update-not-available', () => diffuserMaj({ etat: 'aucune' }))
+  u.on('update-available', (info) => diffuserMaj({ etat: 'disponible', version: info.version }))
+  u.on('download-progress', (p) =>
     diffuserMaj({ etat: 'telechargement', pourcent: Math.round(p.percent) })
   )
-  autoUpdater.on('update-downloaded', (info) =>
-    diffuserMaj({ etat: 'prete', version: info.version })
-  )
-  autoUpdater.on('error', (e) => {
+  u.on('update-downloaded', (info) => diffuserMaj({ etat: 'prete', version: info.version }))
+  u.on('error', (e) => {
     // Hors connexion ou dépôt injoignable : on ne dérange pas l'utilisateur
     console.error('Mise à jour :', e)
     diffuserMaj({ etat: 'erreur' })
   })
 
-  const verifier = () => autoUpdater.checkForUpdates().catch(() => {})
+  const verifier = () => u.checkForUpdates().catch(() => {})
   verifier()
   setInterval(verifier, 4 * 60 * 60 * 1000) // puis toutes les 4 heures
+  return u
+}
+
+function initialiserMisesAJour() {
+  if (!majPromise) majPromise = demarrerMisesAJour()
+  return majPromise
 }
 
 enregistrer('maj:etat', async () => etatMaj)
@@ -678,23 +779,26 @@ enregistrer('maj:verifier', async () => {
   if (is.dev) return etatMaj
   // Ne relance pas une vérification pendant un téléchargement ou si la mise à jour est prête
   if (etatMaj.etat === 'telechargement' || etatMaj.etat === 'prete') return etatMaj
-  await autoUpdater.checkForUpdates()
+  const u = await initialiserMisesAJour()
+  await u.checkForUpdates()
   return etatMaj
 })
 
 enregistrer('maj:telecharger', async () => {
   if (is.dev) throw new ErreurMetier('Les mises à jour sont désactivées en développement.')
   if (etatMaj.etat !== 'disponible') throw new ErreurMetier('Aucune mise à jour à télécharger.')
+  const u = await initialiserMisesAJour()
   diffuserMaj({ etat: 'telechargement', pourcent: 0 })
-  await autoUpdater.downloadUpdate()
+  await u.downloadUpdate()
   return { success: true }
 })
 
 enregistrer('maj:installer', async () => {
   if (is.dev) throw new ErreurMetier('Les mises à jour sont désactivées en développement.')
   if (etatMaj.etat !== 'prete') throw new ErreurMetier("La mise à jour n'est pas encore téléchargée.")
+  const u = await initialiserMisesAJour()
   // (silencieux = false, relancer après installation = true)
-  setImmediate(() => autoUpdater.quitAndInstall(false, true))
+  setImmediate(() => u.quitAndInstall(false, true))
   return { success: true }
 })
 
@@ -702,7 +806,9 @@ enregistrer('maj:installer', async () => {
 //  CYCLE DE VIE DE L'APPLICATION
 // ============================================================
 
-app.whenReady().then(async () => {
+app.whenReady().then(() => {
+  journal('Electron prêt')
+
   // Définit aussi l'identité de l'icône dans la barre des tâches (Windows)
   electronApp.setAppUserModelId('com.hypnos.app')
 
@@ -724,26 +830,16 @@ app.whenReady().then(async () => {
     })
   })
 
-  const prete = await initialiserBase()
-  // Une application installée sans base utilisable ne peut rien faire : on la ferme.
-  // En développement on continue pour pouvoir corriger sans tout relancer.
-  if (!prete && app.isPackaged) {
-    app.quit()
-    return
-  }
+  // Les migrations démarrent tout de suite, EN PARALLÈLE de l'affichage de l'écran de chargement
+  basePromise = initialiserBase().catch((e) => {
+    console.error('Base de données :', e)
+    return false
+  })
 
-  // if (prete) {
-  //   try {
-  //     await amorcerDev()
-  //   } catch (e) {
-  //     console.error('Amorçage :', e)
-  //   }
-  // }
-
-  createOnloadingWindow()
+  demarrerParcours()
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createOnloadingWindow()
+    if (BrowserWindow.getAllWindows().length === 0) demarrerParcours()
   })
 })
 
