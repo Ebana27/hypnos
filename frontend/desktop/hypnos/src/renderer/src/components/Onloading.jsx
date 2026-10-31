@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import './styles/onloading.css'
+import './styles/Onloading.css'
 
 const DESIGN_W = 1111 // taille de la maquette Figma
 const DESIGN_H = 400
