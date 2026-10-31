@@ -62,6 +62,7 @@ class PersonnelSerializer(serializers.ModelSerializer):
         fields = [
             'matricule',
             'user',
+            'nomComplet',
             'sexe',
             'poste',
         ]

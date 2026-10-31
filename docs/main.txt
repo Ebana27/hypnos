@@ -1,0 +1,902 @@
+// App.jsx
+
+import { useState } from 'react'
+import { HashRouter, Route, Routes, Navigate, useLocation } from 'react-router-dom'
+
+// Composants Pages
+import LoginRoute from './components/Login'
+import Register from './components/Register'
+import Sidebar from './components/base/SideBar'
+import TiltleBar from './components/base/TiltleBar'
+
+// Pages react
+import AccountingPage from './pages/AccountingPage'
+import BookingPage from './pages/BookingPage'
+import ClientPage from './pages/ClientPage'
+import CommunicationPage from './pages/CommunicationPage'
+import HomePage from './pages/HomePage'
+import ParamPage from './pages/ParamPage'
+import RapportPage from './pages/RapportPage'
+import RoomPage from './pages/RoomPage'
+import ServicePage from './pages/ServicePage'
+
+function AppContent() {
+  
+  return (
+    <div style={{ display: 'flex', marginTop: '32px', height: 'calc(100vh - 32px)' }}>
+      <TiltleBar />
+      <Sidebar />
+      <main style={{ flex: 1, padding: '20px' }}>
+        <Routes>
+          {/* Page auth*/}
+          <Route path="/login" element={<LoginRoute />} />
+    
+          {/* Page d'accueil*/}
+          <Route path="/" element={<HomePage />} />
+    
+          {/* Page clients détai*/}
+          <Route path="/clients" element={<ClientPage />} />
+    
+          {/* Page Comptablité*/}
+          <Route path="/accounting" element={<AccountingPage />} />
+    
+          {/* Page Reservation*/}
+          <Route path="/booking" element={<BookingPage />} />
+    
+          {/* Page Communication*/}
+          <Route path="/communication" element={<CommunicationPage />} />
+    
+          {/* Page Paramètre*/}
+          <Route path="/param" element={<ParamPage />} />
+    
+          {/* Page Rapport*/}
+          <Route path="/rapports" element={<RapportPage />} />
+    
+          {/* Page Chambres détails*/}
+          <Route path="/rooms" element={<RoomPage />} />
+    
+          {/* Page Services*/}
+          <Route path="/services" element={<ServicePage />} />
+    
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </main>
+    </div>
+  )
+}
+
+function App() {
+
+  return (
+    <HashRouter>
+      <AppContent />
+    </HashRouter>
+  )
+}
+
+export default App
+
+
+// main.jsx
+/*Point d'entrer de l'app Electron ?*/
+
+// Style global de l'app
+import './assets/styles/main.css'
+
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+
+import App from './App'
+
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+)
+
+
+/*Le fichier base.css contient des style de base de l'application*/
+
+/* ============================================================
+   PALETTE HYPNOS
+   Les 5 couleurs de la marque. Toute l'application doit passer
+   par ces variables -- ne jamais ecrire une couleur en dur dans
+   un autre fichier CSS.
+
+   Style de base : CLAIR, en aplats. Pas de degrade.
+   Le mode sombre reste disponible : il surcharge seulement les
+   jetons de surface et de texte, pas la palette.
+   ============================================================ */
+:root {
+  --medium-blue: #141cc5;
+  --onyx: #0f110c;
+  --platinum: #ededed;
+  --amethyst-smoke: #9f86c0;
+  --soft-periwinkle: #a390e4;
+
+  /* Nuances de bordures, derivees de la palette pour ne pas avoir a
+     inventer de nouvelles couleurs a la main. */
+  --line-light: color-mix(in srgb, var(--amethyst-smoke) 26%, transparent);
+  --line-strong: color-mix(in srgb, var(--medium-blue) 35%, transparent);
+
+  --radius-s: 8px;
+  --radius-m: 14px;
+  --shadow-light: 0 1px 2px rgb(15 17 12 / 0.06), 0 8px 24px -16px rgb(15 17 12 / 0.25);
+  --shadow-dark: 0 24px 60px -30px rgb(0 0 0 / 0.9);
+
+  color-scheme: light;
+}
+
+/* ============================================================
+   JETONS DE SURFACE ET DE TEXTE
+   Ces variables sont le contrat entre base.css et les composants :
+   un composant lit --color-*, il ne lit jamais la palette directe.
+   ============================================================ */
+:root {
+  /* --- Base claire --- */
+  --color-background: #ffffff;
+  --color-background-soft: var(--platinum);
+  --color-background-mute: color-mix(in srgb, var(--platinum) 70%, var(--amethyst-smoke));
+  --color-surface: #ffffff;
+
+  --color-text: color-mix(in srgb, var(--onyx) 72%, var(--platinum));
+  --color-text-muted: color-mix(in srgb, var(--onyx) 52%, var(--platinum));
+  --color-text-faint: color-mix(in srgb, var(--onyx) 38%, var(--platinum));
+
+  --color-accent: var(--medium-blue);
+  --color-accent-strong: color-mix(in srgb, var(--medium-blue) 82%, var(--onyx));
+  --color-accent-soft: var(--amethyst-smoke);
+  --color-accent-wash: color-mix(in srgb, var(--medium-blue) 8%, transparent);
+  --color-accent-contrast: var(--platinum);
+  --color-border: var(--line-light);
+  --color-shadow: var(--shadow-light);
+
+  --ev-button-alt-border: transparent;
+  --ev-button-alt-text: var(--color-text);
+  --ev-button-alt-bg: var(--color-background-soft);
+  --ev-button-alt-hover-border: var(--color-border);
+  --ev-button-alt-hover-text: var(--onyx);
+  --ev-button-alt-hover-bg: color-mix(in srgb, var(--medium-blue) 8%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: var(--onyx);
+    --color-background-soft: color-mix(in srgb, var(--onyx) 94%, var(--soft-periwinkle));
+    --color-background-mute: color-mix(in srgb, var(--onyx) 88%, var(--soft-periwinkle));
+    --color-surface: color-mix(in srgb, var(--onyx) 92%, var(--medium-blue));
+
+    --color-text: color-mix(in srgb, var(--platinum) 78%, transparent);
+    --color-text-muted: color-mix(in srgb, var(--platinum) 58%, transparent);
+    --color-text-faint: color-mix(in srgb, var(--platinum) 38%, transparent);
+
+    --color-accent: var(--soft-periwinkle);
+    --color-accent-strong: var(--amethyst-smoke);
+    --color-accent-soft: var(--soft-periwinkle);
+    --color-accent-wash: color-mix(in srgb, var(--soft-periwinkle) 14%, transparent);
+    --color-accent-contrast: var(--onyx);
+    --color-border: color-mix(in srgb, var(--soft-periwinkle) 24%, transparent);
+    --color-shadow: var(--shadow-dark);
+
+    --ev-button-alt-text: var(--color-text);
+    --ev-button-alt-bg: var(--color-background-soft);
+    --ev-button-alt-hover-text: var(--platinum);
+
+    color-scheme: dark;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  font-weight: normal;
+}
+
+ul {
+  list-style: none;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--color-text);
+  background: var(--color-background);
+  line-height: 1.6;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    'Fira Sans',
+    'Droid Sans',
+    'Helvetica Neue',
+    sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Anneau de focus visible partout. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-s);
+}
+
+/*main.css*/
+
+@import './base.css';
+
+/* Ce fichier centralise tout les styles et stylise le composants qui contient toute les autres pages du logiciel */
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--color-background);
+  user-select: none;
+  backdrop-filter: blur(8px);
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 140px; /* laisse la place aux boutons natifs */
+  height: 32px;
+  -webkit-app-region: drag;
+  z-index: 9999;
+}
+
+.containerNew {
+  color: var(--color-text);
+}
+
+button {
+  padding: 10px;
+  /* Aplat : plus de degrade de marque sur les boutons. */
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-size: 15pt;
+  width: 120px;
+  border: none;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  transition:
+    background-color 200ms ease,
+    transform 200ms ease;
+
+  &:hover {
+    background: var(--color-accent-strong);
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+}
+
+.containerNew h1 {
+  font-weight: 800;
+  letter-spacing: 4px;
+}
+
+.containerNew p {
+  font-size: 18pt;
+}
+
+code {
+  font-weight: 600;
+  padding: 3px 5px;
+  border-radius: 2px;
+  background-color: var(--color-background-mute);
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    SF Mono,
+    Menlo,
+    Consolas,
+    Liberation Mono,
+    monospace;
+  font-size: 85%;
+}
+
+#root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  margin-bottom: 80px;
+}
+
+/* ============================================================
+   INTERFACE TEMPORAIRE : accueil + clients
+   DA : fenetre arrondie, navigation en pastilles, cartes bento a grands
+   rayons, graphiques fins, une carte sombre pour contraster.
+   Respect de base.css : aucune couleur en dur, aplats uniquement
+   (pas de degrade ni de verre depoli), mode sombre via les jetons.
+
+   A mettre dans main.css avec @import. Les selecteurs commencent par
+   .app (specificite plus forte) pour passer devant le style global
+   `button` de main.css (width: 120px, fond accent...).
+   ============================================================ */
+.app {
+  /* Carte "encre" : onyx en clair, periwinkle en sombre. */
+  --ink: var(--onyx);
+  --on-ink: var(--platinum);
+  position: fixed;
+  inset: 0;
+  overflow: auto;
+  padding: clamp(8px, 1.6vw, 20px);
+  background: var(--color-background-mute);
+  font-size: 15px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .app {
+    --ink: var(--soft-periwinkle);
+    --on-ink: var(--onyx);
+  }
+}
+
+.app h2,
+.app h3 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: inherit;
+}
+
+.hx-shell {
+  display: grid;
+  gap: 22px;
+  align-content: start;
+  max-width: 1280px;
+  min-height: 100%;
+  margin: 0 auto;
+  padding: clamp(14px, 2vw, 26px);
+  border-radius: 32px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--color-shadow);
+}
+
+/* ---------- Barre du haut ---------- */
+.hx-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.app .hx-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  padding: 10px 20px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-background-soft);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.app .hx-pill:hover {
+  background: var(--color-accent-wash);
+  color: var(--color-text);
+}
+
+.app .hx-pill.primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.app .hx-pill.primary:hover {
+  background: var(--color-accent-strong);
+}
+
+.app .hx-pill.onink {
+  background: var(--on-ink);
+  border-color: var(--on-ink);
+  color: var(--ink);
+}
+
+.app .hx-pill.ghost {
+  background: none;
+  border-color: currentColor;
+  color: inherit;
+}
+
+.hx-brand {
+  padding: 5px 20px 5px 6px;
+  font-size: 18px;
+}
+
+.hx-mark {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.hx-nav {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: 999px;
+  background: var(--color-background-soft);
+}
+
+.app .hx-navbtn {
+  width: auto;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.app .hx-navbtn:hover {
+  background: none;
+  color: var(--color-text);
+}
+
+.app .hx-navbtn[aria-current='page'],
+.app .hx-navbtn[aria-current='page']:hover {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+.app .hx-navbtn[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.hx-tools {
+  display: flex;
+  gap: 8px;
+}
+
+.app .hx-circ {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-background-soft);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.app .hx-circ:hover {
+  background: var(--color-accent-wash);
+}
+
+/* ---------- En-tete de page ---------- */
+.hx-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 6px;
+}
+
+.hx-head h2 {
+  font-size: clamp(34px, 5vw, 60px);
+  font-weight: 500;
+}
+
+.hx-head p {
+  margin-top: 8px;
+  color: var(--color-text-muted);
+}
+
+/* ---------- Grille bento ---------- */
+.hx-bento {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 14px;
+}
+
+.hx-card {
+  position: relative;
+  grid-column: span 3;
+  min-width: 0;
+  padding: 22px;
+  border-radius: 24px;
+  background: var(--color-background-soft);
+  color: var(--color-text);
+}
+
+.hx-card.w4 { grid-column: span 4; }
+.hx-card.w8 { grid-column: span 8; }
+.hx-card.w12 { grid-column: span 12; }
+
+.hx-card.feat {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.hx-card.ink {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+.hx-card small {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.hx-card.feat small,
+.hx-card.ink small {
+  color: inherit;
+  opacity: 0.8;
+}
+
+.hx-card h3 {
+  margin-bottom: 14px;
+  font-size: 18px;
+}
+
+.hx-big {
+  margin: 8px 0 4px;
+  font-size: 46px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+/* ---------- Listes ---------- */
+.app .hx-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 8px;
+  border-radius: 16px;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  text-align: left;
+}
+
+.hx-list > .hx-row + .hx-row {
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 16px 16px;
+}
+
+.app button.hx-row:hover {
+  background: var(--color-accent-wash);
+}
+
+.app .hx-row[aria-pressed='true'] {
+  background: var(--color-surface);
+}
+
+.hx-row b {
+  display: block;
+  font-weight: 600;
+}
+
+.hx-av {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--amethyst-smoke);
+  color: var(--onyx);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.hx-av.big {
+  width: 72px;
+  height: 72px;
+  margin-bottom: 14px;
+  background: var(--on-ink);
+  color: var(--ink);
+  font-size: 24px;
+}
+
+.hx-tag {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--color-accent-wash);
+  color: var(--color-accent);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hx-tag.wait {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+.hx-tag.onink {
+  display: inline-block;
+  margin-top: 14px;
+  background: none;
+  border: 1px solid currentColor;
+  color: inherit;
+}
+
+.hx-empty {
+  padding: 16px 8px;
+  color: var(--color-text-muted);
+}
+
+.hx-search {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 11px 20px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  user-select: text;
+}
+
+.hx-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 22px;
+}
+
+/* ---------- Graphiques ---------- */
+.hx-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 150px;
+  margin: 8px auto 0;
+}
+
+.hx-ring svg {
+  width: 100%;
+  transform: rotate(-90deg);
+}
+
+.hx-ring circle {
+  fill: none;
+  stroke-width: 12;
+  stroke-linecap: round;
+}
+
+.hx-ring .track {
+  stroke: var(--color-border);
+}
+
+.hx-ring .value {
+  stroke: var(--color-accent);
+}
+
+.hx-ring span {
+  position: absolute;
+  text-align: center;
+  line-height: 1.1;
+}
+
+.hx-ring b {
+  display: block;
+  font-size: 30px;
+  font-weight: 500;
+}
+
+.hx-ring span i {
+  display: block;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.hx-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 130px;
+}
+
+.hx-bars i {
+  width: 10px;
+  border-radius: 99px;
+  background: var(--color-border);
+}
+
+.hx-bars i.on {
+  background: var(--color-accent);
+}
+
+.hx-days {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+/* ---------- Adaptation aux petites fenetres ---------- */
+@media (max-width: 1000px) {
+  .hx-card { grid-column: span 6; }
+  .hx-card.w4,
+  .hx-card.w8,
+  .hx-card.w12 { grid-column: span 12; }
+}
+
+@media (max-width: 640px) {
+  .hx-card { grid-column: span 12; }
+  .hx-nav { order: 3; width: 100%; }
+}
+
+.logo {
+  margin-bottom: 20px;
+  -webkit-user-drag: none;
+  height: 128px;
+  width: 128px;
+  will-change: filter;
+  transition: filter 300ms;
+}
+
+.logo:hover {
+  filter: drop-shadow(0 0 1.2em var(--medium-blue));
+}
+
+.creator {
+  font-size: 14px;
+  line-height: 16px;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.text {
+  font-size: 28px;
+  color: var(--color-text);
+  font-weight: 700;
+  line-height: 32px;
+  text-align: center;
+  margin: 0 10px;
+  padding: 16px 0;
+}
+
+.tip {
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+/* Ancien dégradé de texte : remplacé par une couleur unie. */
+.react {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.actions {
+  display: flex;
+  padding-top: 32px;
+  margin: -6px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.action {
+  flex-shrink: 0;
+  padding: 6px;
+}
+
+.action a {
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  border: 1px solid transparent;
+  text-align: center;
+  font-weight: 600;
+  white-space: nowrap;
+  border-radius: 20px;
+  padding: 0 20px;
+  line-height: 38px;
+  font-size: 14px;
+  border-color: var(--ev-button-alt-border);
+  color: var(--ev-button-alt-text);
+  background-color: var(--ev-button-alt-bg);
+}
+
+.action a:hover {
+  border-color: var(--ev-button-alt-hover-border);
+  color: var(--ev-button-alt-hover-text);
+  background-color: var(--ev-button-alt-hover-bg);
+}
+
+.versions {
+  position: absolute;
+  bottom: 30px;
+  margin: 0 auto;
+  padding: 15px 0;
+  font-family: 'Menlo', 'Lucide Console', monospace;
+  display: inline-flex;
+  overflow: hidden;
+  align-items: center;
+  border-radius: 22px;
+  background-color: var(--color-background-soft);
+  backdrop-filter: blur(24px);
+}
+
+.versions li {
+  display: block;
+  float: left;
+  border-right: 1px solid var(--color-border);
+  padding: 0 20px;
+  font-size: 14px;
+  line-height: 14px;
+  opacity: 0.8;
+  &:last-child {
+    border: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .text {
+    font-size: 20px;
+  }
+}
+
+@media (max-width: 620px) {
+  .versions {
+    display: none;
+  }
+}
+
+@media (max-width: 350px) {
+  .tip,
+  .actions {
+    display: none;
+  }
+}
+
+.titlebar {
+  -webkit-app-region: drag;
+  display: flex;
+  justify-content: flex-end;
+  height: 32px;
+}
+.titlebar button {
+  -webkit-app-region: no-drag;
+  width: 40px;
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+
+  &:hover {
+    color: var(--color-text);
+  }
+}

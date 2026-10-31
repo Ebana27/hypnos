@@ -34,7 +34,7 @@ class Client(models.Model):
     # Rajouter un help_text sur preference
     preference = models.CharField(max_length=255, blank=True)
     sexe = models.CharField(max_length=1, choices=SEXE_CHOICES)
-    loyalty = models.BooleanField(default=False)
+    loyalty = models.BooleanField(default=False, help_text="Sera modifier/préciser depuis le logiciel par l'utilisateur.")
 
     class Meta:
         db_table = "client"
@@ -313,7 +313,7 @@ class Reservation(_ReglesMetier):
         related_name="reservations",
         null=True,
         blank=True,
-        help_text="Demande du site web a l'origine de cette reservation.",
+        help_text="Demande du site web a l'origine de cette reservation. Optionnel, si la reservation n'est pas à l'origine d'une demande.",
     )
     date_debut = models.DateTimeField(
         help_text="Arrivee effective du client (check-in de l'hotel par defaut).",

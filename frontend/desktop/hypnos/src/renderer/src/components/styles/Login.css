@@ -1,0 +1,250 @@
+/* Maquette Figma 1512 x 982 : deux colonnes 50/50, adaptees a la fenetre. */
+.login {
+  display: flex;
+  min-height: 100vh;
+  background: #fff;
+  font-family: 'Outfit Variable', 'Outfit', system-ui, sans-serif;
+}
+
+/* ---------- Colonne gauche ---------- */
+.login-aside {
+  position: relative;
+  flex: 0 0 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 56px 60px 120px;
+  overflow: hidden;
+  background: #0727e6;
+  color: #fff;
+}
+
+.login-circle {
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* Grand cercle violet en bas a gauche */
+.login-circle--bottom {
+  left: -58.5%;
+  top: 54%;
+  width: 142.9%;
+  background: linear-gradient(90deg, rgba(7, 39, 230, 0) 0%, #7b4df8 100%);
+}
+
+/* Cercle clair en haut a droite */
+.login-circle--top {
+  left: 36.5%;
+  top: -21%;
+  width: 101.3%;
+  background: linear-gradient(to bottom right, rgba(7, 39, 230, 0) 20%, rgba(91, 107, 255, 0.9) 100%);
+}
+
+.login-brand,
+.login-pitch {
+  position: relative;
+  z-index: 1;
+}
+
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.login-brand-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.login-brand-name {
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.login-pitch h2 {
+  margin: 0 0 40px;
+  font-family: 'Clash Display', 'Outfit Variable', sans-serif;
+  font-weight: 600;
+  font-size: 54px;
+  line-height: 58px;
+}
+
+.login-pitch p {
+  margin: 0;
+  font-size: 22px;
+  line-height: 28px;
+  opacity: 0.9;
+}
+
+/* ---------- Colonne droite ---------- */
+.login-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 460px;
+}
+
+.login-form h1 {
+  margin: 0;
+  font-size: 44px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #0f110c;
+}
+
+.login-subtitle {
+  margin: 4px 0 40px;
+  font-size: 18px;
+  color: #6b6b6b;
+}
+
+.login-label {
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #6b6b6b;
+}
+
+.login-label--spaced {
+  margin-top: 30px;
+}
+
+.login-input {
+  width: 100%;
+  height: 48px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border: 1.5px solid #d9d9d9;
+  border-radius: 14px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 17px;
+  color: #0f110c;
+  outline: none;
+  transition: border-color 150ms;
+}
+
+.login-input::placeholder {
+  color: #9a9a9a;
+}
+
+.login-input:focus {
+  border-color: #141cc5;
+}
+
+.login-password {
+  position: relative;
+}
+
+.login-password .login-input {
+  padding-right: 52px;
+}
+
+.login-eye {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #6b6b6b;
+  cursor: pointer;
+}
+
+.login-eye:hover {
+  color: #0f110c;
+}
+
+/* Reserve toujours la place du message : le formulaire ne "saute" pas */
+.login-error {
+  min-height: 20px;
+  margin: 16px 0 24px;
+  font-size: 14px;
+  color: #d92d20;
+}
+
+.login-btn {
+  height: 52px;
+  padding: 0 18px;
+  border-radius: 26px;
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: opacity 150ms, background 150ms;
+}
+
+.login-btn--primary {
+  border: 0;
+  background: #141cc5;
+  color: #fff;
+}
+
+.login-btn--primary:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.login-btn--primary:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.login-btn--ghost {
+  margin-top: 14px;
+  border: 1.5px solid #cfcfcf;
+  background: #fff;
+  color: #0f110c;
+}
+
+.login-btn--ghost:hover {
+  background: #f6f6f6;
+}
+
+.login-footer {
+  margin: 36px 0 0;
+  text-align: center;
+  font-size: 17px;
+  color: #6b6b6b;
+}
+
+.login-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  color: #141cc5;
+  cursor: pointer;
+}
+
+.login-link:hover {
+  text-decoration: underline;
+}
+
+/* Fenetre etroite : on garde uniquement le formulaire */
+@media (max-width: 860px) {
+  .login-aside {
+    display: none;
+  }
+}

@@ -1,0 +1,217 @@
+/* ============================================================
+   base.css — FONDATIONS DU DESIGN
+   ------------------------------------------------------------
+   Rôle : définir CE QUE SONT les couleurs, polices, rayons et
+   ombres d'Hypnos. Ce fichier ne contient AUCUNE mise en page
+   (pas de .app-layout, pas de boutons) : cela vit dans main.css.
+
+   Il contient :
+     1. la palette brute (seul endroit où l'on écrit des couleurs)
+     2. les échelles (rayons, ombres, polices)
+     3. les jetons --color-* en thème clair
+     4. les jetons --color-* en thème sombre
+     5. le reset et la typographie de base
+
+   Règle d'or : un composant lit --color-*, jamais la palette.
+   Style de base : CLAIR, en aplats, sans dégradé.
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   1. PALETTE BRUTE
+   ------------------------------------------------------------ */
+:root {
+  /* Les 5 couleurs de la marque */
+  --medium-blue: #141cc5;
+  --onyx: #0f110c;
+  --platinum: #ededed;
+  --amethyst-smoke: #9f86c0;
+  --soft-periwinkle: #a390e4;
+
+  /* Neutres de l'interface (issus des maquettes) */
+  --white: #ffffff;
+  --hypnos-black: #0a0a0f;
+  --hypnos-ghost: #f5f6ff;
+  --hypnos-ghost-mute: #ededf5;
+  --hypnos-lilas: #d9cde3;
+  --hypnos-lilas-light: #e9dff2;
+  --hypnos-text: #14141a;
+  --hypnos-text-muted: #6b6b7b;
+  --hypnos-border: #e2e2ea;
+
+  /* Indigo : couleur d'action principale et ses variantes */
+  --hypnos-indigo: var(--medium-blue);
+  --hypnos-indigo-hover: #1e26d6;
+  --hypnos-indigo-dark: #0f1490;
+
+  /* Couleurs d'état (Payée, En attente, erreurs de formulaire…).
+     Absentes de la palette de marque : à ajuster si besoin. */
+  --state-success: #1f9d6b;
+  --state-warning: #d98a1b;
+  --state-danger: #d33b4f;
+}
+
+/* ------------------------------------------------------------
+   2. ÉCHELLES
+   ------------------------------------------------------------ */
+:root {
+  --radius-s: 8px;
+  --radius-m: 14px;
+  --radius-l: 20px;
+  --radius-xl: 36px; /* coin arrondi de la zone de contenu */
+  --radius-pill: 999px;
+
+  --shadow-light: 0 1px 2px rgb(15 17 12 / 0.06), 0 8px 24px -16px rgb(15 17 12 / 0.25);
+  --shadow-dark: 0 24px 60px -30px rgb(0 0 0 / 0.9);
+
+  --font-body: 'Outfit', 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Inter', 'Outfit', sans-serif;
+}
+
+/* ------------------------------------------------------------
+   3. JETONS — THÈME CLAIR (par défaut)
+   ------------------------------------------------------------ */
+:root {
+  color-scheme: light;
+
+  /* Surfaces */
+  --color-background: var(--hypnos-ghost); /* cadre de l'application */
+  --color-background-soft: var(--hypnos-ghost-mute);
+  --color-background-mute: var(--hypnos-lilas-light);
+  --color-surface: var(--white); /* zone de contenu, cartes, modales */
+
+  /* Texte */
+  --color-text: var(--hypnos-text);
+  --color-text-muted: var(--hypnos-text-muted);
+  --color-text-faint: color-mix(in srgb, var(--hypnos-text-muted) 65%, var(--hypnos-ghost));
+
+  /* Accent */
+  --color-accent: var(--hypnos-indigo);
+  --color-accent-hover: var(--hypnos-indigo-hover);
+  --color-accent-strong: var(--hypnos-indigo-dark);
+  --color-accent-soft: var(--amethyst-smoke);
+  --color-accent-wash: color-mix(in srgb, var(--hypnos-indigo) 8%, transparent);
+  --color-accent-contrast: var(--white);
+
+  /* Bordures, ombres, défilement */
+  --color-border: var(--hypnos-border);
+  --color-border-strong: color-mix(in srgb, var(--hypnos-indigo) 35%, transparent);
+  --color-shadow: var(--shadow-light);
+  --color-scrollbar: var(--hypnos-lilas);
+
+  /* États */
+  --color-success: var(--state-success);
+  --color-warning: var(--state-warning);
+  --color-danger: var(--state-danger);
+
+  /* Panneaux de marque (connexion, création, présentation) : identiques en clair et en sombre */
+  --color-brand: var(--medium-blue);
+  --color-brand-contrast: var(--white);
+}
+
+/* ------------------------------------------------------------
+   4. JETONS — THÈME SOMBRE
+   Seuls les jetons de surface, de texte et d'accent changent.
+   Le thème se choisit avec l'attribut data-theme sur <html> :
+     data-theme="light"  → clair forcé
+     data-theme="dark"   → sombre forcé
+     (aucun attribut)    → suit le système (« Automatique »)
+   Les deux blocs ci-dessous ont le même contenu : CSS ne permet
+   pas de les partager entre @media et un sélecteur d'attribut.
+   ------------------------------------------------------------ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --color-background: var(--hypnos-black);
+    --color-background-soft: color-mix(in srgb, var(--hypnos-black) 94%, var(--soft-periwinkle));
+    --color-background-mute: color-mix(in srgb, var(--hypnos-black) 88%, var(--soft-periwinkle));
+    --color-surface: color-mix(in srgb, var(--hypnos-black) 92%, var(--medium-blue));
+
+    --color-text: color-mix(in srgb, var(--platinum) 85%, transparent);
+    --color-text-muted: color-mix(in srgb, var(--platinum) 58%, transparent);
+    --color-text-faint: color-mix(in srgb, var(--platinum) 38%, transparent);
+
+    --color-accent: var(--soft-periwinkle);
+    --color-accent-hover: color-mix(in srgb, var(--soft-periwinkle) 85%, var(--white));
+    --color-accent-strong: var(--amethyst-smoke);
+    --color-accent-soft: var(--soft-periwinkle);
+    --color-accent-wash: color-mix(in srgb, var(--soft-periwinkle) 14%, transparent);
+    --color-accent-contrast: var(--onyx);
+
+    --color-border: color-mix(in srgb, var(--soft-periwinkle) 24%, transparent);
+    --color-border-strong: color-mix(in srgb, var(--soft-periwinkle) 45%, transparent);
+    --color-shadow: var(--shadow-dark);
+    --color-scrollbar: color-mix(in srgb, var(--amethyst-smoke) 45%, transparent);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-background: var(--hypnos-black);
+  --color-background-soft: color-mix(in srgb, var(--hypnos-black) 94%, var(--soft-periwinkle));
+  --color-background-mute: color-mix(in srgb, var(--hypnos-black) 88%, var(--soft-periwinkle));
+  --color-surface: color-mix(in srgb, var(--hypnos-black) 92%, var(--medium-blue));
+
+  --color-text: color-mix(in srgb, var(--platinum) 85%, transparent);
+  --color-text-muted: color-mix(in srgb, var(--platinum) 58%, transparent);
+  --color-text-faint: color-mix(in srgb, var(--platinum) 38%, transparent);
+
+  --color-accent: var(--soft-periwinkle);
+  --color-accent-hover: color-mix(in srgb, var(--soft-periwinkle) 85%, var(--white));
+  --color-accent-strong: var(--amethyst-smoke);
+  --color-accent-soft: var(--soft-periwinkle);
+  --color-accent-wash: color-mix(in srgb, var(--soft-periwinkle) 14%, transparent);
+  --color-accent-contrast: var(--onyx);
+
+  --color-border: color-mix(in srgb, var(--soft-periwinkle) 24%, transparent);
+  --color-border-strong: color-mix(in srgb, var(--soft-periwinkle) 45%, transparent);
+  --color-shadow: var(--shadow-dark);
+  --color-scrollbar: color-mix(in srgb, var(--amethyst-smoke) 45%, transparent);
+}
+
+/* ------------------------------------------------------------
+   Alias hérités du gabarit electron-vite, gardés pour ne rien
+   casser. À supprimer quand plus aucun fichier ne les utilise.
+   ------------------------------------------------------------ */
+:root {
+  --ev-c-black: var(--hypnos-black);
+  --ev-button-alt-border: transparent;
+  --ev-button-alt-text: var(--color-text);
+  --ev-button-alt-bg: var(--color-background-soft);
+  --ev-button-alt-hover-border: var(--color-border);
+  --ev-button-alt-hover-text: var(--color-text);
+  --ev-button-alt-hover-bg: var(--color-accent-wash);
+}
+
+/* ------------------------------------------------------------
+   5. RESET ET TYPOGRAPHIE DE BASE
+   ------------------------------------------------------------ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  font-weight: normal;
+}
+
+ul {
+  list-style: none;
+}
+
+body {
+  color: var(--color-text);
+  background: var(--color-background);
+  font-family: var(--font-body);
+  line-height: 1.6;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Anneau de focus visible partout. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-s);
+}

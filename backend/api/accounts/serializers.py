@@ -67,6 +67,13 @@ class UserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'hotel': "Un compte doit etre rattache a un hotel."
             })
+        # A la creation, le mot de passe est obligatoire : sans lui, create()
+        # ferait un pop() sans defaut (KeyError -> 500) et la colonne NOT NULL
+        # refuserait l'insertion.
+        if self.instance is None and not attrs.get('password'):
+            raise serializers.ValidationError({
+                'password': "Le mot de passe est obligatoire a la creation."
+            })
 
         # Un compte ne peut pas s'attribuer lui-meme le droit d'ecrire, ni
         # changer d'hotel, ni se retirer le role qui l'autorisait. Seule

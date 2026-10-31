@@ -1,7 +1,9 @@
 appId: com.hypnos.app
 productName: hypnos
 directories:
-  buildResources: build
+  # resources/icon.png (1025x1025) sert d'icone : electron-builder le
+  # convertit en .ico pour Windows et en .icns pour macOS.
+  buildResources: resources
 files:
   - '!**/.vscode/*'
   - '!src/*'
@@ -12,13 +14,15 @@ asarUnpack:
   - resources/**
 win:
   executableName: hypnos
+  icon: resources/icon.png
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
-  entitlementsInherit: build/entitlements.mac.plist
+  icon: resources/icon.png
+  entitlementsInherit: resources/entitlements.mac.plist
   extendInfo:
     - NSCameraUsageDescription: Application requests access to the device's camera.
     - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
@@ -28,6 +32,7 @@ mac:
 dmg:
   artifactName: ${name}-${version}.${ext}
 linux:
+  icon: resources/icon.png
   target:
     - AppImage
     - snap

@@ -7,7 +7,7 @@ Ce projet contient **trois applications dans un seul depot** :
 | Dossier                | Application            | Branche de deploiement |
 | ---------------------- | ---------------------- | ---------------------- |
 | `backend/api`          | API Django (REST)      | `main`                 |
-| `frontend/website/site`| Site vitrine (React)   | `main`                 |
+| `frontend/website/site.leceleste` | Site de l'hôtel (React) | `main`             |
 | `frontend/desktop/hypnos` | App Electron         | `main`                 |
 
 **Il n'existe pas de branche `api`, `website` ou `desktop`.** Ce serait la
@@ -65,7 +65,7 @@ Git applique un **diff**, fichier par fichier. Il ne remplace jamais un
 dossier par un autre. Concretement :
 
 - la branche ne contient que `backend/api/**` de modifie
-- `frontend/website/site/**` est copie tel quel, sans conflit possible
+- `frontend/website/site.leceleste/**` est copie tel quel, sans conflit possible
 - un conflit ne peut survenir que si **deux personnes ont modifie le meme
   fichier du meme dossier**, ce qui est le comportement voulu
 
@@ -87,8 +87,9 @@ Pages), le deploiement n'a pas besoin d'une branche par application :
   commande `python manage.py migrate && gunicorn config.wsgi:application`.
   Le deploiement se fait au push sur `main`, automatiquement.
 - Vercel / Netlify / Cloudflare Pages : idem, le site est construit a
-  chaque push sur `main`. Ces services lisent `frontend/website/site`
-  comme racine de projet, il n'y a rien a ecrire.
+  chaque push sur `main`. Ces services lisent
+  `frontend/website/site.leceleste` comme racine de projet, il n'y a rien a
+  ecrire.
 - L'app desktop : deja gere par `.github/workflows/release-desktop.yml`,
   sur publication d'un tag `v1.0.0`.
 

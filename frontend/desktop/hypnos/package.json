@@ -1,9 +1,9 @@
 {
-  "name": "hypnos",
+  "name": "Hypnos",
   "version": "1.0.0",
-  "description": "An Electron application with React",
+  "description": "Une application Electron avec React destiner à la gestion d'un Hôtel",
   "main": "./out/main/index.js",
-  "author": "example.com",
+  "author": "hypnos.com",
   "homepage": "https://electron-vite.org",
   "scripts": {
     "format": "prettier --write .",
@@ -17,15 +17,25 @@
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux"
   },
+  "build": {
+    "win": {
+      "icon": "./resources/icon.png"
+    }
+  },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
-    "electron-updater": "^6.3.9"
+    "@libsql/client": "^0.18.0",
+    "drizzle-orm": "^0.45.4",
+    "electron-updater": "^6.3.9",
+    "lucide-react": "^1.61.0"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config": "^2.1.0",
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",
+    "@electron/rebuild": "^4.2.1",
     "@vitejs/plugin-react": "^5.1.1",
+    "drizzle-kit": "^0.31.11",
     "electron": "^39.2.6",
     "electron-builder": "^26.0.12",
     "electron-vite": "^5.0.0",
@@ -36,6 +46,7 @@
     "prettier": "^3.7.4",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
+    "react-router-dom": "^7.18.4",
     "vite": "^7.2.6"
   }
 }

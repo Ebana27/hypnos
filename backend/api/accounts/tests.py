@@ -429,13 +429,19 @@ class TrailingSlashTests(TestCase):
 
 class BootstrapSequenceTests(TestCase):
     """
-    La chaine de demarrage : compte racine -> jeton -> hotel -> comptes.
+    La chaine de demarrage, une fois le proprietaire deja installe.
 
-    `/api/token/` est un endpoint de CONNEXION : il exige un compte deja
-    existant, donc il ne rend aucun jeton lors d'une creation. Et le tout
-    premier compte ne peut pas passer par l'API, puisque la contrainte
-    `user_hotel_ou_superuser` exige soit un hotel, soit le statut superuser
-    que l'API ne doit jamais attribuer.
+    Elle commence par `createsuperuser` parce que ce test part d'une base
+    deja peuplee. Le TOUT premier compte, lui, passe par la porte de
+    demarrage de l'API (`X-Bootstrap-Token`, table vide) : voir
+    `BootstrapApiTests`. C'etait necessaire parce que
+    `/api/token/` est un endpoint de CONNEXION -- il exige un compte deja
+    existant -- et que la contrainte `user_hotel_ou_superuser` exige soit un
+    hotel, soit le statut superuser que l'API ne doit jamais attribuer.
+    Aucun des deux ne permet donc de demarrer par l'API seule.
+
+    L'ordre compte ensuite : un compte ne peut pas exister sans son hotel,
+    donc le proprietaire cree l'etablissement avant ses agents.
     """
 
     def test_full_chain_from_root_account_to_new_user(self):

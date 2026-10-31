@@ -6,13 +6,23 @@ from django.views.generic import TemplateView
 from django.views.decorators.http import require_GET
 from rest_framework.viewsets import ModelViewSet
 
+from accounts.permissions import HypnosPermission
 from .models import Notification
 from .serializers import NotifSerializer
 
 
 class NotifViewSet(ModelViewSet):
-    queryset = Notification.objects.order_by("id_notif")
+    # Une notification est personnelle : sans ce filtre, tout compte
+    # authentifie lisait (et supprimait) les notifications de tous les hotels.
+    # Tri par plus recent, conforme au Meta du modele et a docs/api.md.
     serializer_class = NotifSerializer
+    permission_classes = [HypnosPermission]
+
+    def get_queryset(self):
+        queryset = Notification.objects.order_by("-created_at")
+        if self.request.user.is_superuser:
+            return queryset
+        return queryset.filter(user=self.request.user)
 
 
 class HomeView(TemplateView):

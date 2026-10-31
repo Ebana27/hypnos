@@ -188,8 +188,11 @@ class Personnel(models.Model):
         on_delete=models.PROTECT,
         related_name="personnel",
         db_column="id_user",
-        help_text="Compte Hypnos de cet employe.",
+        help_text="Compte Hypnos de cet employe si nécessaire.",
+        null=True,
+        blank=True
     )
+    nomComplet = models.CharField(max_length=50)
     sexe = models.CharField(max_length=1, choices=SEXE_CHOICES)
     poste = models.CharField(max_length=100)
 
@@ -200,7 +203,7 @@ class Personnel(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.prenom} {self.nom} ({self.poste})"
+        return f"{self.prenom} {self.nom} {self.nomComplet} ({self.poste})"
 
     # -- proprietes de lecture -------------------------------------------------
     # Elles rendent le code et les templates lisibles. ATTENTION : une
@@ -208,18 +211,21 @@ class Personnel(models.Model):
     # par la relation : Personnel.objects.filter(user__hotel=X), jamais
     # Personnel.objects.filter(hotel=X).
 
+    # `user` etant desormais nullable, chaque lecture verifie qu'un compte
+    # existe : sans ce garde, __str__ et la liste de l'admin plantaient en
+    # AttributeError sur un employe sans compte.
     @property
     def hotel(self):
-        return self.user.hotel
+        return self.user.hotel if self.user_id else None
 
     @property
     def hotel_id(self):
-        return self.user.hotel_id
+        return self.user.hotel_id if self.user_id else None
 
     @property
     def nom(self):
-        return self.user.last_name
+        return self.user.last_name if self.user_id else ""
 
     @property
     def prenom(self):
-        return self.user.first_name
+        return self.user.first_name if self.user_id else ""
