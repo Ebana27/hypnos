@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarRange, List, LogIn, LogOut, Plus, X, Maximize2, Minimize2 } from 'lucide-react'
+import { CalendarRange, List, LogIn, LogOut, Plus, X, Maximize2, Minimize2, ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import BookingTimeline from '../components/BookingTimeline'
 import Button from '../components/base/Button'
 import FailToast from '../components/base/FailToast'
@@ -329,6 +329,73 @@ const STYLES = `
   .booking-new { grid-template-columns: 1fr; }
   .booking-new__grid { grid-template-columns: 1fr; }
 }
+
+/* ---------- Modale réservation / facturation à trois colonnes ---------- */
+.booking-modal-grid {
+  display: grid;
+  grid-template-columns: minmax(215px, .95fr) minmax(275px, 1.08fr) minmax(235px, .97fr);
+  align-items: stretch;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+.booking-modal-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+}
+.booking-modal-column--client { background: var(--color-background-soft); }
+.booking-modal-column--invoice { background: var(--color-background-soft); }
+.booking-modal-heading { margin: 0; font-family: var(--font-display); font-size: 15px; font-weight: 600; }
+.booking-modal-caption { margin: -8px 0 0; color: var(--color-text-muted); font-size: 11px; line-height: 1.45; }
+.booking-modal-separator { height: 1px; margin: 1px 0; border: 0; background: var(--color-border); }
+.booking-modal-grid .booking-new__client { gap: 6px; }
+.booking-modal-contact { display: grid; gap: 9px; margin-top: 2px; }
+.booking-modal-contact__row { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.booking-modal-contact__row span { color: var(--color-text-muted); font-size: 10px; }
+.booking-modal-contact__row strong { overflow-wrap: anywhere; color: var(--color-text); font-size: 12px; font-weight: 500; }
+.booking-modal-calendar-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.booking-modal-calendar-head strong { font-family: var(--font-display); font-size: 14px; text-transform: capitalize; }
+.booking-modal-calendar-nav { display: flex; gap: 4px; }
+.booking-modal-calendar-nav button { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); color: var(--color-text); cursor: pointer; }
+.booking-modal-calendar-nav button:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.booking-modal-calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+.booking-modal-weekday { display: grid; place-items: center; min-height: 24px; color: var(--color-text-muted); font-size: 9px; font-weight: 600; text-transform: uppercase; }
+.booking-modal-day { display: grid; place-items: center; min-width: 0; aspect-ratio: 1; border: 0; border-radius: 8px; background: transparent; color: var(--color-text); font: inherit; font-size: 11px; cursor: pointer; }
+.booking-modal-day:hover { background: var(--color-accent-wash); }
+.booking-modal-day--outside { color: var(--color-text-faint); }
+.booking-modal-day--range { border-radius: 0; background: var(--color-accent-wash); color: var(--color-accent); }
+.booking-modal-day--selected { border-radius: 8px; background: var(--color-accent); color: var(--color-accent-contrast); font-weight: 700; }
+.booking-modal-date-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.booking-modal-date-chip { display: flex; flex-direction: column; gap: 3px; padding: 8px 9px; border: 1px solid var(--color-border); border-radius: 9px; background: var(--color-surface); color: var(--color-text); text-align: left; cursor: pointer; }
+.booking-modal-date-chip[aria-pressed='true'] { border-color: var(--color-accent); box-shadow: inset 0 0 0 1px var(--color-accent); }
+.booking-modal-date-chip span { color: var(--color-text-muted); font-size: 9px; }
+.booking-modal-date-chip strong { font-size: 11px; }
+.booking-modal-select { width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-s); background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 12px; }
+.booking-modal-extra { display: grid; gap: 8px; }
+.booking-modal-invoice-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.booking-modal-invoice-list li, .booking-modal-total-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; color: var(--color-text-muted); font-size: 11px; }
+.booking-modal-invoice-list strong, .booking-modal-total-row strong { color: var(--color-text); font-size: 12px; font-weight: 600; text-align: right; }
+.booking-modal-invoice-note { margin: 0; padding: 9px; border-radius: var(--radius-s); background: var(--color-accent-wash); color: var(--color-text-muted); font-size: 10px; line-height: 1.45; }
+.booking-modal-invoice-total { display: grid; gap: 9px; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--color-border); }
+.booking-modal-invoice-total .booking-modal-total-row:last-child { align-items: baseline; color: var(--color-text); font-size: 12px; font-weight: 700; }
+.booking-modal-invoice-total .booking-modal-total-row:last-child strong { color: var(--color-accent); font-family: var(--font-display); font-size: 19px; }
+.booking-modal-confirm { width: 100%; justify-content: center; }
+.booking-modal-footnote { margin: 0; color: var(--color-text-faint); font-size: 9px; line-height: 1.4; }
+@media (max-width: 940px) {
+  .booking-modal-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .booking-modal-column--invoice { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .booking-modal-grid { grid-template-columns: 1fr; }
+  .booking-modal-column--invoice { grid-column: auto; }
+}
+
 `
 
 injecterStyles('hypnos-page-reservations', STYLES)
@@ -427,6 +494,8 @@ const formulaireInitial = (prefill = {}) => ({
   nom: '',
   prenom: '',
   tel: '',
+  email: '',
+  adresseFacturation: '',
   sexe: 'M',
   chambreId: prefill.chambreId ? String(prefill.chambreId) : '',
   debut: prefill.debut ?? cleJour(aujourdhui()),
@@ -440,7 +509,11 @@ function ModaleNouvelle({ prefill, modele, chargement, onFermer, onCreer, onErre
   const [form, setForm] = useState(() => formulaireInitial(prefill))
   const [rechercheClient, setRechercheClient] = useState('')
   const [listeClientsOuverte, setListeClientsOuverte] = useState(false)
-  const [extras, setExtras] = useState({ heureArrivee: '', litBebe: false, arriveeTardive: false, preferenceCalme: false, demandes: '' })
+  const [champDateActif, setChampDateActif] = useState('debut')
+  const [heureArrivee, setHeureArrivee] = useState('14:00')
+  const [extras, setExtras] = useState({ litBebe: false, arriveeTardive: false, preferenceCalme: false, demandes: '' })
+  const dateDepartInitiale = new Date(`${form.debut}T12:00:00`)
+  const [moisAffiche, setMoisAffiche] = useState(() => new Date(dateDepartInitiale.getFullYear(), dateDepartInitiale.getMonth(), 1))
   const maj = (champ) => (e) => setForm((f) => ({ ...f, [champ]: e.target.value }))
   const nouveauClient = form.clientId === NOUVEAU_CLIENT
   const periodeValide = Boolean(form.debut && form.fin && form.fin > form.debut)
@@ -454,6 +527,13 @@ function ModaleNouvelle({ prefill, modele, chargement, onFermer, onCreer, onErre
       .slice(0, 10)
   }, [modele.clients, modele.clientsRecents, queryClient])
 
+  const joursCalendrier = useMemo(() => {
+    const premier = new Date(moisAffiche.getFullYear(), moisAffiche.getMonth(), 1)
+    const decalageLundi = (premier.getDay() + 6) % 7
+    const debutGrille = new Date(premier.getFullYear(), premier.getMonth(), 1 - decalageLundi)
+    return Array.from({ length: 42 }, (_, i) => new Date(debutGrille.getFullYear(), debutGrille.getMonth(), debutGrille.getDate() + i))
+  }, [moisAffiche])
+
   const libres = useMemo(
     () => periodeValide
       ? modele.chambres.filter((c) => !enConflit(modele.resas, { chambreId: c.id, debut: form.debut, fin: form.fin }))
@@ -461,20 +541,45 @@ function ModaleNouvelle({ prefill, modele, chargement, onFermer, onCreer, onErre
     [periodeValide, form.debut, form.fin, modele]
   )
   const chambre = modele.chambresParId[Number(form.chambreId)]
-  const estimation = chambre && periodeValide
-    ? `${libelleNuits(nuitsEntre(form.debut, form.fin))} · ${formatArgent(nuitsEntre(form.debut, form.fin) * chambre.prixNuit)} ${DEVISE}`
-    : undefined
+  const nuits = periodeValide ? nuitsEntre(form.debut, form.fin) : 0
+  const sousTotal = chambre && nuits > 0 ? nuits * chambre.prixNuit : 0
+  const estimation = chambre && periodeValide ? `${libelleNuits(nuits)} · ${formatArgent(sousTotal)} ${DEVISE}` : undefined
+  const libelleDate = (date) => date ? new Date(`${date}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : 'À choisir'
 
   function choisirClient(client) {
-    setForm((f) => ({ ...f, clientId: String(client.id) }))
+    setForm((f) => ({
+      ...f,
+      clientId: String(client.id),
+      prenom: client.prenom ?? '',
+      nom: client.nom ?? '',
+      tel: client.tel ?? '',
+      email: client.email ?? '',
+      adresseFacturation: client.adresseFacturation ?? client.adresse ?? ''
+    }))
     setRechercheClient(`${client.prenom ?? ''} ${client.nom ?? ''}`.trim())
     setListeClientsOuverte(false)
   }
 
   function choisirNouveauClient() {
-    setForm((f) => ({ ...f, clientId: NOUVEAU_CLIENT, nom: '', prenom: '', tel: '', sexe: 'M' }))
+    setForm((f) => ({ ...f, clientId: NOUVEAU_CLIENT, nom: '', prenom: '', tel: '', email: '', adresseFacturation: '', sexe: 'M' }))
     setRechercheClient('')
     setListeClientsOuverte(false)
+  }
+
+  function choisirJour(date) {
+    const cle = cleJour(date)
+    setMoisAffiche(new Date(date.getFullYear(), date.getMonth(), 1))
+    if (champDateActif === 'debut') {
+      setForm((f) => ({ ...f, debut: cle, fin: f.fin > cle ? f.fin : cleJour(ajouterJours(date, 1)) }))
+      setChampDateActif('fin')
+      return
+    }
+    if (cle <= form.debut) {
+      setForm((f) => ({ ...f, debut: cle, fin: cleJour(ajouterJours(date, 1)) }))
+    } else {
+      setForm((f) => ({ ...f, fin: cle }))
+    }
+    setChampDateActif('debut')
   }
 
   function valider() {
@@ -486,31 +591,34 @@ function ModaleNouvelle({ prefill, modele, chargement, onFermer, onCreer, onErre
     const personnes = Number(form.personnes)
     if (!(personnes >= 1)) return onErreur('Il faut au moins une personne.')
     if (chambre && personnes > chambre.capacite) return onErreur(`Cette chambre accueille ${chambre.capacite} personne(s) au maximum.`)
-    // extras est volontairement gardé côté interface seulement : aucune colonne correspondante dans le schéma actuel.
     return onCreer(form)
   }
+
+  const joursSemaine = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di']
+  const moisLibelle = moisAffiche.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
 
   return (
     <Modal
       ouvert
       onFermer={onFermer}
       titre="Nouvelle réservation"
-      description="Renseignez le séjour et les besoins d’accueil du client."
-      taille="l"
-      libelleValider="Réserver"
-      onValider={valider}
-      chargement={chargement}
+      description="Client · séjour · récapitulatif estimatif"
+      taille="xl"
+      pied={<div className="booking-modal__footer-placeholder" />}
     >
-      <div className="booking-new">
-        <section className="booking-new__principal" aria-label="Détails du séjour">
+      <div className="booking-modal-grid">
+        {/* COLONNE 1 — CLIENT */}
+        <section className="booking-modal-column booking-modal-column--client" aria-label="Informations du client">
+          <h3 className="booking-modal-heading">Client</h3>
+          <p className="booking-modal-caption">Sélectionne une fiche récente ou recherche un client.</p>
           <div className="booking-new__client">
-            <label className="booking-new__client-label" htmlFor="booking-client">Client <span aria-hidden="true">*</span></label>
+            <label className="booking-new__client-label" htmlFor="booking-client">Client</label>
             <input
               id="booking-client"
               className="booking-new__client-input"
               type="search"
               autoComplete="off"
-              placeholder={clientSelectionne ? `${clientSelectionne.prenom} ${clientSelectionne.nom}` : 'Rechercher parmi les clients…'}
+              placeholder={clientSelectionne ? `${clientSelectionne.prenom} ${clientSelectionne.nom}` : 'Nom, téléphone, e-mail…'}
               value={nouveauClient ? 'Créer un nouveau client' : rechercheClient}
               onFocus={() => !nouveauClient && setListeClientsOuverte(true)}
               onChange={(e) => {
@@ -523,7 +631,7 @@ function ModaleNouvelle({ prefill, modele, chargement, onFermer, onCreer, onErre
             />
             {listeClientsOuverte && !nouveauClient && (
               <div className="booking-new__suggestions" id="booking-client-suggestions" role="listbox">
-                <div className="booking-new__suggestions-label">{queryClient ? 'Résultats (10 maximum)' : 'Clients récents'}</div>
+                <div className="booking-new__suggestions-label">{queryClient ? 'Résultats — 10 max.' : 'Clients récents — 5 max.'}</div>
                 {clientsProposes.length ? clientsProposes.map((client) => (
                   <button className="booking-new__suggestion" key={client.id} type="button" role="option" onMouseDown={(e) => e.preventDefault()} onClick={() => choisirClient(client)}>
                     <strong>{client.prenom} {client.nom}</strong>
@@ -535,49 +643,116 @@ function ModaleNouvelle({ prefill, modele, chargement, onFermer, onCreer, onErre
                 </button>
               </div>
             )}
-            {nouveauClient && (
-              <div className="booking-new__grid">
-                <Input label="Prénom" requis value={form.prenom} onChange={maj('prenom')} />
-                <Input label="Nom" requis value={form.nom} onChange={maj('nom')} />
-                <Input label="Téléphone" placeholder="+242 …" value={form.tel} onChange={maj('tel')} />
-                <Input label="Sexe" value={form.sexe} onChange={maj('sexe')} options={OPTIONS_SEXE} />
-                <Button variante="secondaire" taille="s" onClick={() => { setForm((f) => ({ ...f, clientId: '' })); setRechercheClient('') }}>Choisir un client existant</Button>
-              </div>
-            )}
           </div>
 
-          <div className="booking-new__grid">
-            <Input label="Arrivée" type="date" requis value={form.debut} onChange={maj('debut')} />
-            <Input label="Départ" type="date" requis value={form.fin} min={form.debut} onChange={maj('fin')} aide={estimation} />
-          </div>
-          <Input
-            label="Chambre"
-            requis
-            placeholder={libres.length ? 'Choisir une chambre' : 'Aucune chambre libre'}
-            value={form.chambreId}
-            onChange={maj('chambreId')}
-            aide={periodeValide ? 'Les chambres occupées sur ces dates sont exclues.' : undefined}
-            options={libres.map((c) => ({ valeur: String(c.id), libelle: `Chambre ${c.numero} · ${c.typeLabel} · ${formatArgent(c.prixNuit)} ${DEVISE}/nuit` }))}
-          />
-          <div className="booking-new__grid">
-            <Input label="Nombre de personnes" type="number" min={1} requis value={form.personnes} onChange={maj('personnes')} />
-            <Input label="Canal de réservation" value={form.canal} onChange={maj('canal')} options={OPTIONS_CANAL} />
-          </div>
-          <Input label="Statut initial" value={form.statut} onChange={maj('statut')} options={OPTIONS_STATUT} />
+          {nouveauClient ? (
+            <div className="booking-modal-contact">
+              <Input label="Prénom" requis value={form.prenom} onChange={maj('prenom')} />
+              <Input label="Nom" requis value={form.nom} onChange={maj('nom')} />
+              <Input label="E-mail" type="email" value={form.email} onChange={maj('email')} />
+              <Input label="Téléphone" placeholder="+242 …" value={form.tel} onChange={maj('tel')} />
+              <label className="booking-new__client-label" htmlFor="booking-billing-address">Adresse de facturation</label>
+              <textarea id="booking-billing-address" className="booking-new__textarea" rows={3} placeholder="Adresse (facultative)" value={form.adresseFacturation} onChange={maj('adresseFacturation')} />
+              <Input label="Sexe" value={form.sexe} onChange={maj('sexe')} options={OPTIONS_SEXE} />
+            </div>
+          ) : clientSelectionne ? (
+            <div className="booking-modal-contact">
+              <div className="booking-modal-contact__row"><span>Nom complet</span><strong>{clientSelectionne.prenom} {clientSelectionne.nom}</strong></div>
+              <div className="booking-modal-contact__row"><span>E-mail</span><strong>{clientSelectionne.email || 'Non renseigné'}</strong></div>
+              <div className="booking-modal-contact__row"><span>Téléphone</span><strong>{clientSelectionne.tel || 'Non renseigné'}</strong></div>
+              <div className="booking-modal-contact__row"><span>Adresse de facturation</span><strong>{clientSelectionne.adresseFacturation || clientSelectionne.adresse || 'Non renseignée'}</strong></div>
+              <Button variante="secondaire" taille="s" onClick={() => { setForm((f) => ({ ...f, clientId: '' })); setRechercheClient(''); setListeClientsOuverte(true) }}>Changer de client</Button>
+            </div>
+          ) : (
+            <p className="booking-modal-caption">Choisis un client pour afficher ses coordonnées ou crée une nouvelle fiche.</p>
+          )}
+          <p className="booking-modal-footnote">Les coordonnées e-mail et téléphone sont enregistrées pour un nouveau client. L’adresse de facturation n’est pas prise en charge par la base actuelle.</p>
         </section>
 
-        <aside className="booking-new__extras" aria-label="Préférences d’accueil">
-          <h3 className="booking-new__section-title">Préparer l’accueil</h3>
-          <p className="booking-new__section-note">Options de confort pour cette réservation.</p>
-          <Input label="Heure d’arrivée estimée" type="time" value={extras.heureArrivee} onChange={(e) => setExtras((x) => ({ ...x, heureArrivee: e.target.value }))} />
-          <div className="booking-new__checklist">
+        {/* COLONNE 2 — CALENDRIER, HEURE ET INFORMATIONS */}
+        <section className="booking-modal-column" aria-label="Dates et détails du séjour">
+          <h3 className="booking-modal-heading">Dates du séjour</h3>
+          <div className="booking-modal-date-switch">
+            <button type="button" className="booking-modal-date-chip" aria-pressed={champDateActif === 'debut'} onClick={() => setChampDateActif('debut')}>
+              <span>Arrivée · sélectionner</span><strong>{libelleDate(form.debut)}</strong>
+            </button>
+            <button type="button" className="booking-modal-date-chip" aria-pressed={champDateActif === 'fin'} onClick={() => setChampDateActif('fin')}>
+              <span>Départ · sélectionner</span><strong>{libelleDate(form.fin)}</strong>
+            </button>
+          </div>
+          <div className="booking-modal-calendar-head">
+            <strong>{moisLibelle}</strong>
+            <div className="booking-modal-calendar-nav">
+              <button type="button" aria-label="Mois précédent" onClick={() => setMoisAffiche((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}><ChevronLeft size={16} /></button>
+              <button type="button" aria-label="Mois suivant" onClick={() => setMoisAffiche((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}><ChevronRight size={16} /></button>
+            </div>
+          </div>
+          <div className="booking-modal-calendar" role="grid" aria-label={`Calendrier ${moisLibelle}`}>
+            {joursSemaine.map((jour) => <span className="booking-modal-weekday" role="columnheader" key={jour}>{jour}</span>)}
+            {joursCalendrier.map((date) => {
+              const cle = cleJour(date)
+              const dansMois = date.getMonth() === moisAffiche.getMonth()
+              const debut = cle === form.debut
+              const fin = cle === form.fin
+              const dansPeriode = form.debut && form.fin && cle > form.debut && cle < form.fin
+              const classes = `booking-modal-day${!dansMois ? ' booking-modal-day--outside' : ''}${dansPeriode ? ' booking-modal-day--range' : ''}${debut || fin ? ' booking-modal-day--selected' : ''}`
+              return <button type="button" role="gridcell" aria-label={date.toLocaleDateString('fr-FR')} aria-pressed={debut || fin} className={classes} key={cle} onClick={() => choisirJour(date)}>{date.getDate()}</button>
+            })}
+          </div>
+          <hr className="booking-modal-separator" />
+          <div className="booking-modal-extra">
+            <Input
+              label="Heure d’arrivée estimée"
+              value={heureArrivee}
+              onChange={(e) => setHeureArrivee(e.target.value)}
+              options={['12:00', '14:00', '16:00', '18:00', '20:00', '22:00'].map((h) => ({ valeur: h, libelle: h }))}
+            />
+            <Input
+              label="Chambre"
+              placeholder={libres.length ? 'Choisir une chambre' : 'Aucune chambre libre'}
+              value={form.chambreId}
+              onChange={maj('chambreId')}
+              aide={periodeValide ? 'Seules les chambres disponibles sur ces dates sont proposées.' : undefined}
+              options={libres.map((c) => ({ valeur: String(c.id), libelle: `${c.numero} · ${c.typeLabel} · ${formatArgent(c.prixNuit)} ${DEVISE}/nuit` }))}
+            />
+            <div className="booking-new__grid">
+              <Input label="Personnes" type="number" min={1} value={form.personnes} onChange={maj('personnes')} />
+              <Input label="Canal" value={form.canal} onChange={maj('canal')} options={OPTIONS_CANAL} />
+            </div>
+            <Input label="Statut initial" value={form.statut} onChange={maj('statut')} options={OPTIONS_STATUT} />
+          </div>
+          <hr className="booking-modal-separator" />
+          <div className="booking-modal-extra">
+            <h4 className="booking-modal-heading">Informations additionnelles</h4>
             <label className="booking-new__check"><input type="checkbox" checked={extras.litBebe} onChange={(e) => setExtras((x) => ({ ...x, litBebe: e.target.checked }))} /> Lit bébé</label>
             <label className="booking-new__check"><input type="checkbox" checked={extras.arriveeTardive} onChange={(e) => setExtras((x) => ({ ...x, arriveeTardive: e.target.checked }))} /> Arrivée tardive</label>
             <label className="booking-new__check"><input type="checkbox" checked={extras.preferenceCalme} onChange={(e) => setExtras((x) => ({ ...x, preferenceCalme: e.target.checked }))} /> Chambre au calme si possible</label>
+            <textarea className="booking-new__textarea" rows={2} aria-label="Notes de séjour" placeholder="Notes ou demandes particulières…" value={extras.demandes} onChange={(e) => setExtras((x) => ({ ...x, demandes: e.target.value }))} />
+            <p className="booking-modal-footnote">Heure et préférences restent provisoires tant que le schéma ne contient pas ces champs.</p>
           </div>
-          <label className="booking-new__client-label" htmlFor="booking-demande">Demande particulière</label>
-          <textarea id="booking-demande" className="booking-new__textarea" placeholder="Ex. oreillers supplémentaires…" value={extras.demandes} onChange={(e) => setExtras((x) => ({ ...x, demandes: e.target.value }))} />
-          <p className="booking-new__non-persistant">Ces préférences sont en aperçu uniquement : le schéma actuel ne permet pas encore de les enregistrer. Elles ne seront pas conservées après la réservation.</p>
+        </section>
+
+        {/* COLONNE 3 — APERÇU DE FACTURE */}
+        <aside className="booking-modal-column booking-modal-column--invoice" aria-label="Aperçu de la facture">
+          <h3 className="booking-modal-heading">Aperçu de la facture</h3>
+          <p className="booking-modal-caption">Montant estimatif avant confirmation.</p>
+          <ul className="booking-modal-invoice-list">
+            <li><span>Client</span><strong>{nouveauClient ? `${form.prenom} ${form.nom}`.trim() || 'Nouveau client' : clientSelectionne ? `${clientSelectionne.prenom} ${clientSelectionne.nom}` : 'À sélectionner'}</strong></li>
+            <li><span>Dates</span><strong>{periodeValide ? `${libelleDate(form.debut)} — ${libelleDate(form.fin)}` : 'À définir'}</strong></li>
+            <li><span>Durée</span><strong>{periodeValide ? libelleNuits(nuits) : '—'}</strong></li>
+            <li><span>Prestation</span><strong>{chambre ? `Chambre ${chambre.numero}` : 'À sélectionner'}</strong></li>
+            {chambre && <li><span>{formatArgent(chambre.prixNuit)} ${DEVISE} × {nuits} nuit(s)</span><strong>{formatArgent(sousTotal)} {DEVISE}</strong></li>}
+          </ul>
+          <div className="booking-modal-invoice-total">
+            <div className="booking-modal-total-row"><span>Sous-total</span><strong>{formatArgent(sousTotal)} {DEVISE}</strong></div>
+            <div className="booking-modal-total-row"><span>TVA</span><strong>Non configurée</strong></div>
+            <div className="booking-modal-total-row"><span>Total estimatif hors TVA</span><strong>{formatArgent(sousTotal)} {DEVISE}</strong></div>
+          </div>
+          <p className="booking-modal-invoice-note">La TVA n’est pas calculée : aucun taux n’est défini dans les paramètres du PMS. Le total affiché est une estimation hors taxe.</p>
+          <Button className="booking-modal-confirm" icone={Check} chargement={chargement} onClick={valider}>
+            Confirmer la réservation
+          </Button>
+          <p className="booking-modal-footnote">Cette action crée la réservation. Le paiement reste à enregistrer ensuite dans sa fiche.</p>
         </aside>
       </div>
     </Modal>
@@ -1007,7 +1182,7 @@ export default function BookingPage({ vueInitiale = 'liste', pleinEcran: pleinEc
           nom: form.nom.trim(),
           prenom: form.prenom.trim(),
           tel: form.tel.trim(),
-          email: '',
+          email: form.email.trim(),
           sexe: form.sexe
         })
         clientId = client.id

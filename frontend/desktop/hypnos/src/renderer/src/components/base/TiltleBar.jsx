@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Minus, Square, SquaresSubtract, X } from 'lucide-react'
+import { Minus, Square, Copy, X } from 'lucide-react'
 import logoHypnos from '../../assets/images/logotype.png'
 
 // ============================================================
@@ -110,7 +110,7 @@ export default function TiltleBar() {
           aria-label={libelleAgrandir}
           title={libelleAgrandir}
         >
-          {agrandie ? <SquaresSubtract size={14} /> : <Square size={14} />}
+          {agrandie ? <Copy size={14} /> : <Square size={14} />}
         </button>
         <button
           type="button"
