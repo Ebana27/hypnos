@@ -47,7 +47,7 @@ jobs:
       - name: Construire et publier l'installateur Windows
         run: npx electron-builder --win --publish always
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.HYPNOS_RELEASE }}
 
   macos:
     name: macOS (.dmg)
@@ -78,6 +78,6 @@ jobs:
       - name: Construire et publier l'installateur macOS
         run: npx electron-builder --mac --publish always
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.HYPNOS_RELEASE }}
           # Application non signée : on désactive la recherche automatique de certificat
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
