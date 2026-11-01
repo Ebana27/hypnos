@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Calendar, FileText, LogIn, LogOut, Plus, UserPlus, Up } from 'lucide-react'
+import { Calendar, FileText, LogIn, LogOut, Plus, UserPlus } from 'lucide-react'
 import Button from '../components/base/Button'
 import CardRoom, { STATUTS_CHAMBRE } from '../components/base/CardRoom'
 import FailToast from '../components/base/FailToast'
@@ -18,7 +18,7 @@ const ACTIONS = [
   { libelle: 'Départ', Icone: LogOut, vers: '/booking', aide: "Enregistrer le départ d'un client" },
   { libelle: 'Ajouter un client', Icone: UserPlus, vers: '/clients' },
   { libelle: 'Importer Excel', Icone: FileText, vers: '/param' },
-  { libelle: 'Up', Icone: up, vers: '/param' },
+  // { libelle: 'Up', Icone: up, vers: '/param' },
   {
     libelle: 'Voir le planning',
     Icone: Calendar,
