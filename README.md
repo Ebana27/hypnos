@@ -17,7 +17,7 @@ hypnos/
 ├── backend/api/           # API Django
 ├── frontend/app/          # Ressources partagées
 ├── frontend/desktop/      # App Electron
-└── frontend/website/      # Site de réservation
+└── frontend/website/      # Site de l'hotel (site.leceleste)
 ```
 
 ## Fonctionnalités (MVP)

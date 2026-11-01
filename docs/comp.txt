@@ -1,0 +1,154 @@
+/*
+  ./styles/SideBar.css
+*/
+
+.sidebar {
+  margin-top: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.sidebar__nav {
+  display: flex;
+  align-items: left;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+}
+
+// .TopBar.jsx
+
+import { Search, Bell } from 'lucide-react'
+import { UTILISATEUR } from '../../data/accueilMock'
+
+// eslint-disable-next-line react/prop-types
+export default function Topbar({ utilisateur = UTILISATEUR }) {
+  return (
+    <div className="topbar">
+      <label className="recherche">
+        <Search strokeWidth={2} />
+        <input type="search" placeholder="Rechercher un client, une chambre, une réservation..." />
+      </label>
+
+      <div className="topbar__droite">
+        <button className="notif" aria-label={`${utilisateur.notifications} notifications`}>
+          <Bell strokeWidth={1.8} />
+          {utilisateur.notifications > 0 && (
+            <span className="notif__pastille">{utilisateur.notifications}</span>
+          )}
+        </button>
+
+        <div className="profil">
+          <span className="profil__avatar" />
+          <div>
+            <span className="profil__nom">{utilisateur.nom}</span>
+            <span className="profil__role">{utilisateur.role}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+} 
+
+import { Minus, Square, X } from "lucide-react";
+
+export default function TiltleBar() {
+  return (
+    <div style={{
+      height: '32px',
+      width: '100%',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      background: '#000000',
+      WebkitAppRegion: 'drag',
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      zIndex: 9999
+    }}>
+      <div style={{ paddingLeft: '12px', fontSize: '13px', fontWeight: 5000 }}>
+        Hypnos
+      </div>
+      <div style={{
+        width: '140px', display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
+        <button onClick={() => window.api.windowControls.minimize()}>
+          <Minus size={16} />
+        </button>
+        <button onClick={() => window.api.windowControls.maximize()}>
+          <Square size={14} />
+        </button>
+        <button onClick={() => window.api.windowControls.close()}>
+          <X size={16} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+import { NavLink, Link } from 'react-router-dom'
+import {
+  House,
+  Calendar,
+  BedDouble,
+  User,
+  MessageSquare,
+  ConciergeBell,
+  Calculator,
+  TrendingUp,
+  Settings
+} from 'lucide-react'
+// import { HOTEL } from '../../data/accueilMock'
+
+import '../styles/SideBar.css'
+
+const LIENS = [
+  { vers: '/', libelle: 'Accueil', Icone: House },
+  { vers: '/booking', libelle: 'Réservations', Icone: Calendar },
+  { vers: '/rooms', libelle: 'Chambres', Icone: BedDouble },
+  { vers: '/clients', libelle: 'Clients', Icone: User },
+  { vers: '/communication', libelle: 'Communication', Icone: MessageSquare },
+  { vers: '/services', libelle: 'Services', Icone: ConciergeBell },
+  { vers: '/accounting', libelle: 'Comptabilité', Icone: Calculator },
+  { vers: '/rapports', libelle: 'Rapports', Icone: TrendingUp }
+]
+
+// eslint-disable-next-line react/prop-types
+export default function Sidebar() {
+  return (
+    <aside className="sidebar">
+      <nav className="sidebar__nav">
+        {LIENS.map(({ vers, libelle, Icone }) => (
+          <NavLink
+            key={vers}
+            to={vers}
+            end={vers === '/'}
+            className={({ isActive }) => `navlien${isActive ? ' navlien--actif' : ''}`}
+          >
+            <Icone strokeWidth={1.8} />
+            <span>{libelle}</span>
+          </NavLink>
+        ))}
+      </nav>
+
+      <div className="sidebar__pied">
+        {/* <div className="hotel">
+          <p className="hotel__nom">{hotel.nom}</p>
+          <p className="hotel__etat">
+            <span className="hotel__point" />
+            {hotel.etat}
+          </p>
+        </div>*/}
+        <Link to="/param" className="parametres">
+          <Settings strokeWidth={1.6} />
+          <span>Paramètres</span>
+        </Link>
+      </div>
+    </aside>
+  )
+}

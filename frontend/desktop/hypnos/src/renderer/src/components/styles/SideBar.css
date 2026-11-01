@@ -1,0 +1,91 @@
+.sidebar {
+  margin-top: 50px;
+  width: 230px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: calc(100vh - 82px);
+  padding: 10px;
+}
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.navlien {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: 12px;
+  color: var(--color-text-muted); text-decoration: none;
+  font-size: 14px; font-weight: 500; width: 100%;
+}
+.navlien--actif {
+  background-color: #E7E8FA;
+  border-radius: 50px;
+  color: #141CC5;
+  font-weight: 500;
+}
+.navlien:hover {
+  background-color: #E7E8FA;
+  border-radius: 50px;
+  color: #141CC5;
+  font-weight: 500;
+}
+.navlien--actifs span:hover {
+  font-weight: 500;
+}
+.parametres {
+  border: 1px solid #141CC5;
+  padding: 12px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  text-decoration: none;
+  gap: 10px;
+}
+.parametres span {
+  font-size: 12pt;
+}
+
+.parametres:active {
+  color: #141CC5;
+}
+.hotel {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 8px;
+   max-width: 228px;
+    height: 76px;
+    border-radius: 8px;
+    background: #ededed;
+    padding: 4px;
+}
+.hotel__nom {
+    width: 139px;
+    height: 24px;
+    font-family: 'inter';
+    font-style: normal;
+    font-weight: 600;
+    font-variation-settings: 'wght' 600;
+    font-optical-sizing: auto;
+    font-size: 16px;
+    line-height: 20px;
+    white-space: nowrap;
+    color: #0f110c;
+}
+.hotel__etat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.hotel__point {
+    width: 10px;
+    height: 10px;
+    background: #17b26a;
+    border-radius: 50%;
+}

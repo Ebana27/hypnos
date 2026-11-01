@@ -1,0 +1,124 @@
+/* ============================================================
+   main.css — STYLE GLOBAL DE L'APPLICATION
+   ------------------------------------------------------------
+   Rôle : décider COMMENT l'application est disposée dans sa
+   fenêtre Electron. Importé une seule fois, par main.jsx.
+
+   Il contient :
+     1. la taille de la fenêtre (html, body, #root)
+     2. la mise en page de la fenêtre principale (.app-*)
+     3. les boutons partagés par toutes les pages
+     4. la barre de défilement
+
+   Ce fichier n'écrit AUCUNE couleur : tout passe par les jetons
+   --color-* définis dans base.css. Le style propre à un
+   composant reste dans le composant (CSS intégré au JS).
+   ============================================================ */
+@import './base.css';
+
+:root {
+  /* Hauteur de la barre de titre personnalisée (TiltleBar).
+     Doit être égale à la hauteur réelle du composant. */
+  --titlebar-height: 25px;
+}
+
+/* ------------------------------------------------------------
+   1. FENÊTRE
+   100% et non 100vw/100vh : évite les débordements et les
+   barres de défilement parasites.
+   ------------------------------------------------------------ */
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ------------------------------------------------------------
+   2. MISE EN PAGE DE LA FENÊTRE PRINCIPALE
+   TiltleBar au-dessus, puis Sidebar à gauche et zone de
+   contenu (Topbar + pages) à droite.
+   ------------------------------------------------------------ */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--color-background);
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  margin-top: var(--titlebar-height);
+  overflow: hidden;
+}
+
+.app-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--color-background);
+}
+
+.app-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  background: var(--color-surface);
+  border-radius: var(--radius-xl) 0 0 0;
+}
+
+/* ------------------------------------------------------------
+   3. BOUTONS PRINCIPAUX
+   Un seul style pour les trois noms de classe existants.
+   ------------------------------------------------------------ */
+button.primary,
+.btn-primary,
+.btn-primary-v2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--color-accent);
+  border-radius: 12px;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-family: var(--font-display);
+  cursor: pointer;
+}
+
+button.primary:hover,
+.btn-primary:hover,
+.btn-primary-v2:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+/* Variante « pastille » */
+.btn-primary-v2 {
+  margin: 8px;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------
+   4. BARRE DE DÉFILEMENT
+   ------------------------------------------------------------ */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-scrollbar);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent);
+}

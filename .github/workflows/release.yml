@@ -1,0 +1,102 @@
+# ============================================================
+# Publication de l'application desktop Hypnos (electron-builder)
+# ============================================================
+# Se déclenche uniquement sur un tag git :
+#   git tag v1.0.1
+#   git push origin v1.0.1
+# Les installateurs sont publiés dans la release du dépôt « hypnos-update-history ».
+name: Publier une version
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: frontend/desktop/hypnos
+
+jobs:
+  release:
+    name: Créer la release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Créer la release si elle n'existe pas
+        # Pas de checkout dans ce job : on ignore le dossier par défaut
+        working-directory: .
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.HYPNOS_RELEASE }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo Ebana27/hypnos-update-history >/dev/null 2>&1 || \
+          gh release create "$GITHUB_REF_NAME" --repo Ebana27/hypnos-update-history \
+            --target main \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Version $GITHUB_REF_NAME"
+
+  windows:
+    name: Windows (.exe)
+    # La release est créée par le job « release » ; Windows et macOS tournent en parallèle.
+    needs: release
+    runs-on: windows-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/desktop/hypnos/package-lock.json
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Aligner la version sur le tag
+        shell: bash
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
+
+      - name: Compiler l'application
+        run: npx electron-vite build
+
+      - name: Construire et publier l'installateur Windows
+        run: npx electron-builder --win --publish always
+        env:
+          GH_TOKEN: ${{ secrets.HYPNOS_RELEASE }}
+
+  macos:
+    name: macOS (.dmg)
+    # La release est créée par le job « release » ; Windows et macOS tournent en parallèle.
+    needs: release
+    runs-on: macos-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/desktop/hypnos/package-lock.json
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Aligner la version sur le tag
+        shell: bash
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
+
+      - name: Compiler l'application
+        run: npx electron-vite build
+
+      - name: Construire et publier l'installateur macOS
+        run: npx electron-builder --mac --publish always
+        env:
+          GH_TOKEN: ${{ secrets.HYPNOS_RELEASE }}
+          # Application non signée : on désactive la recherche automatique de certificat
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"

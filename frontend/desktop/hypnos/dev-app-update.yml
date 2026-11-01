@@ -1,0 +1,4 @@
+provider: github
+owner: Ebana27
+repo: hypnos-update-history
+updaterCacheDirName: hypnos-updater

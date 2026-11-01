@@ -1,0 +1,741 @@
+/* ============================================================
+   LECELESTE — mise en page
+   Grille éditoriale, contrastes papier/encre, un seul accent.
+   ============================================================ */
+
+.wrap {
+  width: 100%;
+  max-width: var(--max);
+  margin-inline: auto;
+  padding-inline: var(--pad);
+}
+
+/* Les ancres (#lieu, #reserver) doivent s'arreter sous l'en-tete
+   fixe : 96px tout en haut, 72px une fois densifie. */
+section[id] {
+  scroll-margin-top: 88px;
+}
+
+/* ---------- En-tete ---------- */
+.site-header {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 80;
+  border-bottom: 1px solid transparent;
+  transition:
+    background-color 0.6s var(--ease),
+    border-color 0.6s var(--ease);
+}
+
+.site-header.is-stuck {
+  background: rgb(247 245 241 / 0.86);
+  backdrop-filter: blur(16px);
+  border-color: var(--line);
+}
+
+.site-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  height: 96px;
+  transition: height 0.6s var(--ease);
+}
+
+.site-header.is-stuck .site-header__inner {
+  height: 72px;
+}
+
+.wordmark {
+  font-family: var(--serif);
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+}
+
+.nav {
+  display: flex;
+  gap: clamp(1.4rem, 3vw, 2.8rem);
+}
+
+.nav a {
+  position: relative;
+  padding: 0.4rem 0;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.nav a::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 100%;
+  bottom: 0;
+  height: 1px;
+  background: var(--ink);
+  transition: right 0.55s var(--ease);
+}
+
+.nav a:hover::after,
+.nav a.is-active::after {
+  right: 0;
+}
+
+.header__actions {
+  display: flex;
+  align-items: center;
+  gap: clamp(1rem, 2vw, 2rem);
+}
+
+.burger {
+  display: none;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.burger span {
+  display: block;
+  height: 1px;
+  background: var(--ink);
+  transition: transform 0.5s var(--ease);
+}
+
+.burger span + span {
+  margin-top: 7px;
+}
+
+.burger[aria-expanded='true'] span:first-child {
+  transform: translateY(4px) rotate(45deg);
+}
+
+.burger[aria-expanded='true'] span:last-child {
+  transform: translateY(-4px) rotate(-45deg);
+}
+
+/* Tiroir mobile */
+.drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 79;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: var(--pad);
+  background: var(--paper);
+}
+
+.drawer a {
+  font-family: var(--serif);
+  font-size: clamp(2.4rem, 12vw, 4rem);
+  line-height: 1.05;
+  color: var(--ink);
+}
+
+.drawer .btn {
+  margin-top: 2rem;
+  align-self: flex-start;
+}
+
+.drawer__foot {
+  margin-top: 3rem;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* ---------- Hero ---------- */
+.hero {
+  position: relative;
+  min-height: 100svh;
+  padding-top: calc(var(--pad) + 96px);
+  padding-bottom: clamp(120px, 18vh, 190px);
+  display: grid;
+  grid-template-columns: 1.02fr 0.98fr;
+  gap: clamp(28px, 5vw, 76px);
+  align-items: center;
+}
+
+/* Titre a masque : chaque ligne est decalee par GSAP. */
+.hero__title .line {
+  display: block;
+  overflow: hidden;
+}
+
+.hero__title em {
+  font-style: italic;
+}
+
+.hero__sub {
+  margin-top: 1.4rem;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: clamp(1.1rem, 1.9vw, 1.6rem);
+  color: var(--ink-2);
+}
+
+.hero__lede {
+  margin-top: clamp(1.8rem, 3vw, 2.8rem);
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+}
+
+.hero__actions {
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+}
+
+/* Cadre decale, l'image passe par-dessus. */
+.hero__visual {
+  position: relative;
+}
+
+.hero__frame {
+  position: absolute;
+  inset: 28px -26px -28px 28px;
+  border: 1px solid var(--line);
+  pointer-events: none;
+}
+
+.hero__media {
+  position: relative;
+  z-index: 1;
+  height: min(72vh, 640px);
+  overflow: hidden;
+  background: var(--paper-2);
+}
+
+.hero__media img {
+  width: 100%;
+  height: 116%;
+  object-fit: cover;
+  will-change: transform;
+}
+
+.hero__caption {
+  position: absolute;
+  left: 0;
+  bottom: -34px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* Bandeau bas du hero */
+.hero__foot {
+  position: absolute;
+  left: var(--pad);
+  right: var(--pad);
+  bottom: var(--pad);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--line);
+}
+
+.hero__facts {
+  display: flex;
+  gap: clamp(1.8rem, 5vw, 5rem);
+}
+
+.fact dt {
+  font-family: var(--serif);
+  font-size: 1.7rem;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.fact dd {
+  margin: 0.35rem 0 0;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.scroll-cue {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  font-size: 10px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.scroll-cue i {
+  display: block;
+  width: 72px;
+  height: 1px;
+  background: currentcolor;
+  transform-origin: left;
+  animation: cue 2.8s var(--ease) infinite;
+}
+
+@keyframes cue {
+  0% {
+    transform: scaleX(0);
+  }
+  45% {
+    transform: scaleX(1);
+  }
+  100% {
+    transform: scaleX(0);
+  }
+}
+
+/* ---------- Bandeau defile ---------- */
+.marquee {
+  overflow: hidden;
+  border-block: 1px solid var(--line);
+  padding: 1rem 0;
+}
+
+.marquee__track {
+  display: flex;
+  width: max-content;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.marquee__track span {
+  padding-right: 3.5rem;
+  font-family: var(--serif);
+  font-size: clamp(1rem, 1.7vw, 1.35rem);
+  color: var(--ink-3);
+}
+
+/* ---------- Intention ---------- */
+.intro {
+  padding-block: clamp(90px, 15vh, 190px);
+}
+
+.intro__grid {
+  display: grid;
+  grid-template-columns: 0.72fr 1.28fr;
+  gap: clamp(28px, 6vw, 90px);
+  align-items: start;
+}
+
+.intro__statement {
+  font-family: var(--serif);
+  font-size: clamp(1.7rem, 3.4vw, 3.1rem);
+  line-height: 1.16;
+  color: var(--ink);
+}
+
+.intro__statement em {
+  font-style: italic;
+  color: var(--ink-3);
+}
+
+.intro__aside {
+  display: flex;
+  flex-direction: column;
+  gap: 2.4rem;
+  padding-top: 0.6rem;
+}
+
+.intro__aside hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+/* ---------- Chambres ---------- */
+.rooms {
+  padding-block: clamp(60px, 9vh, 120px) clamp(90px, 14vh, 170px);
+  border-top: 1px solid var(--line);
+}
+
+.section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2rem;
+  padding-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.room {
+  border-bottom: 1px solid var(--line);
+}
+
+.room__link {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr 14rem 7rem;
+  align-items: center;
+  gap: 1.5rem;
+  padding-block: clamp(1.6rem, 3vw, 2.7rem);
+}
+
+.room__num {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--ink-3);
+}
+
+.room__name {
+  font-family: var(--serif);
+  font-size: clamp(1.7rem, 3.6vw, 3.1rem);
+  line-height: 1;
+  color: var(--ink);
+  transition: transform 0.65s var(--ease);
+}
+
+.room__link:hover .room__name {
+  transform: translateX(1.4rem);
+}
+
+.room__spec,
+.room__price {
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--ink-3);
+}
+
+.room__price {
+  text-align: right;
+  color: var(--ink-2);
+}
+
+/* Vignette qui suit le curseur : l'etat est gere par GSAP. */
+.room__preview {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  width: clamp(210px, 19vw, 310px);
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform;
+}
+
+.room__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---------- Le lieu ---------- */
+.lieu {
+  padding-block: clamp(80px, 13vh, 160px);
+  background: var(--paper-2);
+}
+
+.lieu__grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: clamp(14px, 2.2vw, 30px);
+  margin-top: clamp(40px, 6vw, 76px);
+}
+
+.lieu__item {
+  position: relative;
+  overflow: hidden;
+}
+
+.lieu__item img {
+  width: 100%;
+  height: 114%;
+  object-fit: cover;
+  will-change: transform;
+}
+
+.lieu__item--a {
+  grid-column: 1 / span 5;
+}
+
+.lieu__item--b {
+  grid-column: 7 / span 6;
+  margin-top: 14vh;
+}
+
+.lieu__item--c {
+  grid-column: 2 / span 4;
+  margin-top: -4vh;
+}
+
+.lieu__item figcaption {
+  display: block;
+  padding-top: 0.9rem;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.lieu__text {
+  margin-top: clamp(50px, 8vw, 90px);
+  display: grid;
+  grid-template-columns: 0.72fr 1.28fr;
+  gap: clamp(28px, 6vw, 90px);
+}
+
+/* ---------- Reservation ---------- */
+.booking {
+  background: var(--night);
+  color: rgb(247 245 241 / 0.7);
+  padding-block: clamp(80px, 13vh, 150px) clamp(50px, 7vh, 80px);
+  color-scheme: dark; /* les champs date natifs deviennent sombres */
+}
+
+.booking h2 {
+  color: var(--paper);
+}
+
+.booking__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(40px, 6vw, 90px);
+  align-items: end;
+}
+
+.booking__form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.6rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--night-line);
+  transition: border-color 0.5s var(--ease);
+}
+
+.field:focus-within {
+  border-color: var(--paper);
+}
+
+.field > span {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0.5;
+}
+
+.field input {
+  border: 0;
+  padding: 0;
+  background: none;
+  font-family: var(--serif);
+  font-size: 1.3rem;
+  color: var(--paper);
+}
+
+.field input:focus {
+  outline: none;
+}
+
+.booking__foot {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-top: 1.4rem;
+  flex-wrap: wrap;
+}
+
+.booking__total {
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  color: var(--paper);
+}
+
+/* ---------- Pied de page ---------- */
+.site-footer {
+  background: var(--night);
+  color: rgb(247 245 241 / 0.5);
+  padding: 0 var(--pad) clamp(36px, 6vh, 64px);
+}
+
+.footer__word {
+  display: block;
+  padding-top: clamp(50px, 9vh, 100px);
+  font-family: var(--serif);
+  font-size: clamp(3rem, 13vw, 12rem);
+  line-height: 0.78;
+  letter-spacing: -0.03em;
+  color: var(--paper);
+}
+
+.footer__cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2rem;
+  margin-top: clamp(40px, 6vh, 70px);
+  padding-top: 2.4rem;
+  border-top: 1px solid var(--night-line);
+}
+
+.footer__cols h3 {
+  margin-bottom: 1rem;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgb(247 245 241 / 0.85);
+}
+
+.footer__cols li + li {
+  margin-top: 0.5rem;
+}
+
+.footer__cols a:hover {
+  color: var(--paper);
+}
+
+.footer__legal {
+  margin-top: 2.4rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--night-line);
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ---------- Pages internes ---------- */
+.page {
+  padding-top: calc(var(--pad) + 120px);
+  padding-bottom: clamp(70px, 12vh, 150px);
+}
+
+.page__head {
+  max-width: 46ch;
+}
+
+.rooms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: clamp(24px, 3.4vw, 50px);
+  margin-top: clamp(40px, 6vw, 76px);
+}
+
+.room-card img {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  background: var(--paper-2);
+}
+
+.room-card__body {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding-top: 1.3rem;
+}
+
+.room-card__name {
+  font-family: var(--serif);
+  font-size: 1.8rem;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.room-card__desc {
+  margin-top: 0.7rem;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink-3);
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 1024px) {
+  .hero {
+    grid-template-columns: 1fr;
+    padding-bottom: clamp(140px, 20vh, 200px);
+  }
+
+  .hero__visual {
+    order: -1;
+  }
+
+  .hero__media {
+    height: 52vh;
+  }
+
+  .intro__grid,
+  .lieu__text,
+  .booking__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .room__link {
+    grid-template-columns: 3rem 1fr;
+    row-gap: 0.8rem;
+  }
+
+  .room__spec,
+  .room__price {
+    grid-column: 2;
+    text-align: left;
+  }
+}
+
+@media (max-width: 760px) {
+  .nav,
+  .header__actions .btn {
+    display: none;
+  }
+
+  .burger {
+    display: block;
+  }
+
+  .hero__foot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.4rem;
+  }
+
+  .hero__facts {
+    gap: 1.6rem;
+  }
+
+  .lieu__item--a,
+  .lieu__item--b,
+  .lieu__item--c {
+    grid-column: 1 / -1;
+    margin-top: 0;
+  }
+
+  .booking__form {
+    grid-template-columns: 1fr;
+  }
+
+  .footer__cols {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (hover: none) {
+  .room__preview {
+    display: none;
+  }
+}

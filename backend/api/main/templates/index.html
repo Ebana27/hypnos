@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Hypnos API{% endblock %}
+
+{% block content %}
+    <h1>Hypnos API</h1>
+    <p>Bienvenue sur l'API Hypnos !</p>
+    <p>Utilisez les endpoints suivants pour accéder aux fonctionnalités :</p>
+    <ul>
+        <li><a href="/api/auth/login/">Connexion</a></li>
+        <li><a href="/api/notifications/">Liste des notifications</a></li>
+        <li><a href="/api/users">Liste des utilisateurs</a></li>
+        <li><a href="/api/hotels/">Liste des hôtels</a></li>
+        <li><a href="/api/reservations/">Liste des réservations</a></li>
+    </ul>
+    <p><a class="button" href="/admin/">Administration</a></p>
+{% endblock %}

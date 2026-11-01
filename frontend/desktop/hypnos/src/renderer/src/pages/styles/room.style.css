@@ -1,0 +1,56 @@
+#boutonajouterunecham {
+  position: relative;
+  width: 236px;
+  height: 42px;
+  border-radius: 21px;
+  background: #141cc5;
+}
+
+#libellé {
+  position: absolute;
+  left: 50px;
+  top: 9.5px;
+  width: 168px;
+  height: 23px;
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 500;
+  font-variation-settings: 'wght' 500;
+  font-optical-sizing: auto;
+  font-size: 18px;
+  line-height: 20px;
+  white-space: nowrap;
+  color: #ffffff;
+}
+
+#icôneplus {
+  position: absolute;
+  left: 16px;
+  top: 9px;
+  width: 24px;
+  height: 24px;
+  overflow: hidden;
+}
+
+#vector {
+  position: absolute;
+  left: 5px;
+  top: 5px;
+  width: 14px;
+  height: 14px;
+  border: 1.8px  solid #ffffff;
+}
+
+#vector {
+  position: absolute;
+  top: 7px;
+  width: 14px;
+  height: 0.01px;
+}
+
+#vector {
+  position: absolute;
+  left: 7px;
+  width: 0.01px;
+  height: 14px;
+}

@@ -1,0 +1,3 @@
+/* Netlify / Cloudflare Pages : le site est une SPA, toute URL doit
+   renvoyer index.html pour que react-router-dom puisse la lire. */
+/* /index.html  200

@@ -1,0 +1,53 @@
+# ============================================================
+# CI du SITE WEB (frontend/website/site.leceleste) - React + Vite
+# ============================================================
+# Ne demarre que si un fichier de frontend/website a change.
+# ============================================================
+name: CI - Site web
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "frontend/website/**"
+      - ".github/workflows/ci-website.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "frontend/website/**"
+      - ".github/workflows/ci-website.yml"
+
+concurrency:
+  group: ci-website-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: frontend/website/site.leceleste
+
+jobs:
+  build:
+    name: Lint + build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Installer Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/website/site.leceleste/package-lock.json
+
+      - name: Installer les dependances
+        # `npm ci` et non `npm install` : ci installe exactement les
+        # versions de package-lock.json, comme en production.
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build

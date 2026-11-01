@@ -1,0 +1,64 @@
+# ============================================================
+# CI de l'APPLICATION DESKTOP (frontend/desktop/hypnos) - Electron
+# ============================================================
+# Ne demarre que si un fichier de frontend/desktop a change.
+# ============================================================
+name: CI - App desktop
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "frontend/desktop/**"
+      - ".github/workflows/ci-desktop.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "frontend/desktop/**"
+      - ".github/workflows/ci-desktop.yml"
+
+concurrency:
+  group: ci-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: frontend/desktop/hypnos
+
+jobs:
+  build:
+    name: Lint + build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Installer Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/desktop/hypnos/package-lock.json
+
+      - name: Installer les dependances
+        # --ignore-scripts evite d'executer le `postinstall` qui lance
+        # `electron-builder install-app-deps` : tres lent et necessite des
+        # dependances systeme absentes sur le runner. L'empaquetage reel
+        # est traite par release-desktop.yml.
+        run: npm ci --ignore-scripts
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        # electron-vite build compile le main, le preload et le renderer.
+        # Ce n'est PAS encore un installeur : c'est la verification que le
+        # code compile, ce qui suffit a bloquer une PR cassee.
+        run: npm run build
+
+      - name: Verifier le formatage
+        # On appelle prettier directement : le script "format" du
+        # package.json est `prettier --write .`, qui MODIFIERAIT les
+        # fichiers et ne verifierait donc rien en CI.
+        run: npx prettier --check .

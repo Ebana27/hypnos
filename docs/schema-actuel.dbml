@@ -1,0 +1,300 @@
+// ===========================================================================
+//  Hypnos — DATABASE 1 (côté API, la seule source de vérité)
+//  Version corrigée pour la syntaxe DBML de dbdiagram.io
+//
+//  Deux corrections de fond par rapport au schéma précédent :
+//    1. un compte appartient à UN hôtel (suppression du doublon côté Personnel) ;
+//    2. une Demande est distincte d'une Reservation.
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+//  APP hotels
+// ---------------------------------------------------------------------------
+
+Table hotel {
+  hotel_id int [pk, increment]
+  name varchar(150) [not null]
+  adresse varchar(255) [not null]
+  ville varchar(100) [not null]
+  tel varchar(30) [not null]
+  email varchar(255) [not null]
+  nombre_etages int [not null, note: '>= 1 — etage max d une chambre']
+  nombre_chambres int [not null, note: '>= 0 — SAISI à la création, pas un calcul']
+  heure_arrivee time [not null, default: '15:00:00', note: 'check-in — heure retenue quand le client ne donne qu une date']
+  heure_depart time [not null, default: '11:00:00', note: 'check-out — idem pour le départ']
+
+  Note: 'Racine du domaine. Tout le reste y est rattaché. Les deux heures de reference servent de defaut aux date_debut / date_fin des demandes et reservations.'
+}
+
+Table type_de_chambre {
+  id_type int [pk, increment]
+  label varchar(100) [not null, unique, note: 'Simple, Double, Suite...']
+  prix decimal(10,2) [not null, note: '>= 0 — prix par nuit']
+  capacite int [not null, note: '>= 1 — nb de personnes maxi']
+}
+
+Table chambre {
+  id_chambre int [pk, increment]
+  hotel_id int [not null, note: 'CASCADE']
+  id_type int [not null, note: 'PROTECT — refuse la suppression du type']
+  numero varchar(20) [not null]
+  etage int [not null, note: '>= 0, et <= hotel.nombre_etages']
+  statut varchar(20) [not null, default: 'disponible', note: 'disponible|occupee|maintenance']
+
+  indexes {
+    (hotel_id, numero) [unique, name: 'unique_numero_par_hotel']
+    (hotel_id, statut) [name: 'chambre_hotel_statut_idx']
+  }
+}
+
+Table personnel {
+  matricule int [pk, increment]
+  id_user int [not null, unique, note: 'PROTECT — un employé EST un compte']
+  sexe char(1) [not null, note: 'M|F']
+  poste varchar(100) [not null, note: 'Reception, Receptionniste, Manager...']
+
+  indexes {
+    poste [name: 'personnel_poste_idx']
+  }
+
+  Note: '''
+    COLONNES nom / prenom / hotel SUPPRIMÉES.
+    Elles vivaient en double de user.first_name / last_name / hotel.
+    Rien ne garantissait la cohérence : un agent pouvait avoir un
+    nom différent sur son compte et sur sa fiche.
+    hotel vient de user.hotel, nom vient de user.last_name, etc.
+    Ces 3 attributs existent en Python comme propriétés de lecture,
+    donc utilisables dans un template — mais ce ne sont pas des colonnes.
+  '''
+}
+
+// ---------------------------------------------------------------------------
+//  APP accounts
+// ---------------------------------------------------------------------------
+
+Table "user" {
+  id_user int [pk, increment]
+  username varchar(150) [not null, unique]
+  email varchar(255) [not null, unique, note: 'allauth authentifie par email']
+  password varchar(255) [not null, note: 'haché — jamais en clair']
+  role varchar(30) [not null, default: 'receptionniste', note: 'admin|receptionniste|manager']
+  hotel_id int [note: 'PROTECT — NULL si et seulement si is_superuser']
+  // colonnes héritées de django AbstractUser
+  is_superuser boolean [not null, default: false]
+  is_staff boolean [not null, default: false]
+  is_active boolean [not null, default: true]
+  last_login datetime
+  date_joined datetime
+  first_name varchar(150) [not null, default: '']
+  last_name varchar(150) [not null, default: '']
+
+  Note: '''
+    Seul modèle autorisé à se connecter. Client et Personnel n héritent pas.
+    CHECK user_hotel_ou_superuser : hotel_id IS NOT NULL OR is_superuser
+    La colonne est nullable, mais la contrainte empêche tout compte
+    orphelin. Seule exception : le superadmin, qui doit pouvoir être
+    créé AVANT le premier hôtel (sinon aucun compte ne peut exister).
+    PIEGE : db_table vaut "user", un mot réservé en PostgreSQL.
+    À QUOTER ("user") ou renommer au moment du déploiement Alwaysdata.
+  '''
+}
+
+// ---------------------------------------------------------------------------
+//  APP reservations
+// ---------------------------------------------------------------------------
+
+Table client {
+  id_client int [pk, increment]
+  nom varchar(100) [not null]
+  prenom varchar(100) [not null]
+  tel varchar(30) [not null]
+  email varchar(255) [not null, note: 'indexé mais NON unique : un hôte peut réserver plusieurs fois']
+  document varchar(255) [not null, note: 'vide autorisé']
+  preference varchar(255) [not null, note: 'vide autorisé']
+  sexe char(1) [not null, note: 'M|F']
+  loyalty boolean [not null, default: false]
+
+  indexes {
+    (nom, prenom) [name: 'client_nom_prenom_idx']
+  }
+
+  Note: '''
+    PAS UN COMPTE. Aucun password, aucune session, aucun JWT.
+    Une ligne = UNE demande, pas un client unique.
+  '''
+}
+
+Table demande {
+  num int [pk, increment]
+  hotel_id int [not null, note: 'PROTECT — l hôtel qui reçoit la demande']
+  id_client int [not null, note: 'PROTECT — préserve l historique']
+  chambre_demandee_id int [note: 'SET_NULL — choix du client, peut être vide']
+  date_debut datetime [not null, note: 'INSTANT d arrivée — heure de check-in si le client n en donne pas']
+  date_fin datetime [not null, note: 'INSTANT de départ — heure de check-out par défaut']
+  nombreDePersonne int [not null, note: '>= 1']
+  statut varchar(20) [not null, default: 'en_attente', note: 'en_attente|acceptee|refusee']
+  date_decision datetime [note: 'renseigné par sync.services, jamais par le client']
+  motif_refus varchar(255) [not null, note: 'raison indiquée au client si refus']
+  created_at datetime [not null, note: 'default now']
+  updated_at datetime [not null, note: 'auto now']
+
+  indexes {
+    (statut, date_debut) [name: 'demande_statut_date_idx']
+    (date_debut, date_fin) [name: 'demande_dates_idx']
+  }
+
+  Note: '''
+    Tri par défaut : date_debut
+    CE QUE LE SITE ENVOIE. Une demande n a AUCUNE chambre attribuée :
+    le champ chambre n existe pas ici, il est impossible d y loger
+    une réservation. Elle ne bloque donc AUCUNE chambre.
+    CHECK demande_fin_apres_debut : date_fin > date_debut
+    CHECK demande_min_une_personne : nombreDePersonne >= 1
+    La cohérence hôtel / chambre est vérifiée dans clean(), pas par
+    une contrainte SQL : c est une comparaison de deux colonnes.
+    Les dates sont des INSTANTS : le site peut envoyer une date seule
+    (AAA-MM-JJ), le serializer y applique alors hotel.heure_arrivee /
+    hotel.heure_depart.
+  '''
+}
+
+Table reservation {
+  num int [pk, increment]
+  hotel_id int [not null, note: 'PROTECT']
+  id_client int [not null, note: 'PROTECT']
+  id_chambre int [not null, note: 'PROTECT — NOT NULL, structurellement']
+  demande_id int [note: 'SET_NULL — traçabilité, vide si saisie directe']
+  date_debut datetime [not null, note: 'INSTANT d arrivée — check-in par défaut']
+  date_fin datetime [not null, note: 'INSTANT de départ — check-out par défaut']
+  nombreDePersonne int [not null, note: '>= 1']
+  statut varchar(20) [not null, default: 'confirmee', note: 'confirmee|terminee|annulee']
+  created_at datetime [not null, note: 'default now']
+  updated_at datetime [not null, note: 'auto now']
+
+  indexes {
+    (statut, date_debut) [name: 'reservation_statut_date_idx']
+    (date_debut, date_fin) [name: 'reservation_dates_idx']
+  }
+
+  Note: '''
+    Tri par défaut : -date_debut
+    N existe QUE pour une chambre réellement attribuée. Les colonnes
+    date_decision / motif_refus ont disparu : elles vivent sur la Demande.
+    CHECK reservation_fin_apres_debut : date_fin > date_debut
+    CHECK reservation_min_une_personne : nombreDePersonne >= 1
+    L ancien CHECK "confirmee implique une chambre" est devenu
+    inutile : id_chambre est NOT NULL pour tout le monde.
+    Le refus n est plus un statut ici, il ne crée aucune ligne.
+    Occupation : deux réservations se chevauchent si date_debut < fin
+    ET date_fin > debut, bornes exclues. Comme les bornes sont des
+    instants, une sortie à 11 h et une entrée à 15 h le même jour
+    ne se chevauchent pas, mais une entrée à 9 h ce jour-là, si.
+  '''
+}
+
+// ---------------------------------------------------------------------------
+//  APP main
+// ---------------------------------------------------------------------------
+
+Table notification {
+  id_notif int [pk, increment]
+  id_user int [not null, note: 'CASCADE — sans compte, la notif n a pas de sens']
+  title varchar(150) [not null]
+  detail text [not null]
+  action varchar(150) [not null, note: 'vide autorisé']
+  lu boolean [not null, default: false]
+  created_at datetime [not null, note: 'auto now add']
+
+  indexes {
+    (id_user, lu) [name: 'notif_user_lu_idx']
+  }
+}
+
+// ---------------------------------------------------------------------------
+//  APP sync  (technique — file d'attente du logiciel desktop)
+// ---------------------------------------------------------------------------
+
+Table sync_cursor {
+  id bigint [pk, increment]
+  hotel_id int [not null, note: 'CASCADE']
+  appareil varchar(64) [not null, note: 'identifiant du poste, fourni par Electron']
+  derniere_consultation datetime [note: 'NULL au premier appel']
+  nombre_appels int [not null, default: 0]
+  mis_a_jour datetime [not null, note: 'auto now']
+
+  indexes {
+    (hotel_id, appareil) [unique, name: 'unique_curseur_par_poste']
+  }
+}
+
+Table sync_journal {
+  id bigint [pk, increment]
+  hotel_id int [not null, note: 'CASCADE']
+  demande_id int [not null, note: 'CASCADE — FK vers demande.num']
+  appareil varchar(64) [not null, note: 'vide autorisé']
+  action varchar(40) [not null, note: 'Confirmer|Refuser|Propositions|Erreur']
+  succes boolean [not null, default: true]
+  detail text [not null, note: 'vide autorisé']
+  horodatage datetime [not null, note: 'auto now add']
+
+  indexes {
+    (hotel_id, horodatage) [name: 'sync_journal_hotel_idx']
+  }
+
+  Note: '''
+    Pointe vers demande et non plus reservation : c est la Demande que
+    l agent manipule, y compris quand il refuse et ne crée rien.
+  '''
+}
+
+// ===========================================================================
+//  RELATIONS
+// ===========================================================================
+
+// hotels
+Ref: chambre.hotel_id > hotel.hotel_id              // une chambre -> 1 hôtel
+Ref: chambre.id_type > type_de_chambre.id_type      // une chambre -> 1 type
+Ref: "user".hotel_id > hotel.hotel_id               // un compte -> 0..1 hôtel
+Ref: personnel.id_user - "user".id_user             // 1-1 obligatoire
+
+// reservations
+Ref: demande.hotel_id > hotel.hotel_id
+Ref: demande.id_client > client.id_client
+Ref: demande.chambre_demandee_id > chambre.id_chambre
+Ref: reservation.hotel_id > hotel.hotel_id
+Ref: reservation.id_client > client.id_client
+Ref: reservation.id_chambre > chambre.id_chambre
+Ref: reservation.demande_id > demande.num
+
+// main
+Ref: notification.id_user > "user".id_user
+
+// sync
+Ref: sync_cursor.hotel_id > hotel.hotel_id
+Ref: sync_journal.hotel_id > hotel.hotel_id
+Ref: sync_journal.demande_id > demande.num
+
+// ===========================================================================
+//  POURQUOI LA SÉPARATION DEMANDE / RESERVATION
+// ===========================================================================
+//
+//  Avant, une seule table faisait les deux jobs : `en_attente` avec
+//  `chambre = NULL`. Ça cassait de trois façons.
+//
+//  1. Une demande en attente n'occupe aucune chambre, mais la ligne
+//     portait une chambre. Pour ne pas bloquer les autres demandes, le code
+//     devait maintenir une liste de statuts « bloquants » — donc si un
+//     statut changeait, la logique de disponibilité plantait.
+//
+//  2. `Reservation` ne pouvait pas dire « acceptée » : il fallait un CHECK
+//     « si confirmée ALORS chambre NOT NULL » pour expressément interdire
+//     le cas absurde d'une réservation confirmée sans chambre.
+//
+//  3. On ne pouvait pas refuser une demande sans écrire une
+//     `Reservation` en statut `refusee`, donc une réservation refusée
+//     existait en base.
+//
+//  Après : la Demande vit jusqu'à la décision, puis meurt. La Reservation
+//  naît de l'acceptation, chambre NOT NULL par construction. La file
+//  d'attente devient un simple `statut='en_attente'`, et `annulee` est le
+//  seul statut qui libère une chambre.

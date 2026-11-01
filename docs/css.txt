@@ -1,0 +1,261 @@
+/* mains.css */
+
+@import './base.css';
+
+:root {
+  /* --- IDENTITÉ HYPNOS d'après tes captures --- */
+  --hypnos-black: #0A0A0F;
+  --hypnos-ghost: #F5F6FF;
+  --hypnos-ghost-mute: #EDEDF5;
+  --hypnos-lilas: #D9CDE3;
+  --hypnos-lilas-light: #E9DFF2;
+  --hypnos-indigo: #141CC5;
+  --hypnos-indigo-hover: #1E26D6;
+  --hypnos-indigo-dark: #0F1490;
+  --hypnos-text: #14141A;
+  --hypnos-text-muted: #6B6B7B;
+  --hypnos-border: #E2E2EA;
+
+  /* On écrase les anciennes variables */
+  --color-background: var(--hypnos-ghost);
+  --color-background-soft: var(--hypnos-ghost-mute);
+  --color-background-mute: var(--hypnos-lilas-light);
+  --color-border: var(--hypnos-border);
+  --color-text: var(--hypnos-text);
+  --color-text-muted: var(--hypnos-text-muted);
+  --ev-c-black: var(--hypnos-black);
+}
+
+/* --- FIX FENÊTRE FIGÉE / FOND VIOLET --- */
+html, body, #root {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--hypnos-ghost);
+  font-family: 'Outfit', 'Inter', sans-serif;
+}
+
+/* Layout principal que je t'ai mis dans App.jsx */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  background: var(--hypnos-ghost);
+}
+.app-body {
+  display: flex;
+  flex: 1;
+  margin-top: 32px; /* hauteur de ta TitleBar */
+  overflow: hidden;
+}
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--hypnos-ghost);
+  overflow: hidden;
+}
+.app-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  background: var(--hypnos-ghost);
+}
+
+/* --- BOUTONS A TA COULEUR ELECTRIC INDIGO --- */
+button.primary, .btn-primary {
+  background: var(--hypnos-indigo);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-family: 'Clash Display', sans-serif;
+}
+button.primary:hover {
+  background: var(--hypnos-indigo-hover);
+}
+
+/* Scrollbar à ton identité */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-thumb { background: var(--hypnos-lilas); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--hypnos-indigo); }
+
+-------------------------------------------------------------------------------------
+
+/*Le fichier base.css contient des style de base de l'application*/
+
+/* ============================================================
+   PALETTE HYPNOS
+   Les 5 couleurs de la marque. Toute l'application doit passer
+   par ces variables -- ne jamais ecrire une couleur en dur dans
+   un autre fichier CSS.
+
+   Style de base : CLAIR, en aplats. Pas de degrade.
+   Le mode sombre reste disponible : il surcharge seulement les
+   jetons de surface et de texte, pas la palette.
+   ============================================================ */
+:root {
+  --medium-blue: #141cc5;
+  --onyx: #0f110c;
+  --platinum: #ededed;
+  --amethyst-smoke: #9f86c0;
+  --soft-periwinkle: #a390e4;
+
+  /* Nuances de bordures, derivees de la palette pour ne pas avoir a
+     inventer de nouvelles couleurs a la main. */
+  --line-light: color-mix(in srgb, var(--amethyst-smoke) 26%, transparent);
+  --line-strong: color-mix(in srgb, var(--medium-blue) 35%, transparent);
+
+  --radius-s: 8px;
+  --radius-m: 14px;
+  --shadow-light: 0 1px 2px rgb(15 17 12 / 0.06), 0 8px 24px -16px rgb(15 17 12 / 0.25);
+  --shadow-dark: 0 24px 60px -30px rgb(0 0 0 / 0.9);
+
+  color-scheme: light;
+}
+
+/* ============================================================
+   JETONS DE SURFACE ET DE TEXTE
+   Ces variables sont le contrat entre base.css et les composants :
+   un composant lit --color-*, il ne lit jamais la palette directe.
+   ============================================================ */
+:root {
+  /* --- Base claire --- */
+  --color-background: #ffffff;
+  --color-background-soft: var(--platinum);
+  --color-background-mute: color-mix(in srgb, var(--platinum) 70%, var(--amethyst-smoke));
+  --color-surface: #ffffff;
+
+  --color-text: color-mix(in srgb, var(--onyx) 72%, var(--platinum));
+  --color-text-muted: color-mix(in srgb, var(--onyx) 52%, var(--platinum));
+  --color-text-faint: color-mix(in srgb, var(--onyx) 38%, var(--platinum));
+
+  --color-accent: var(--medium-blue);
+  --color-accent-strong: color-mix(in srgb, var(--medium-blue) 82%, var(--onyx));
+  --color-accent-soft: var(--amethyst-smoke);
+  --color-accent-wash: color-mix(in srgb, var(--medium-blue) 8%, transparent);
+  --color-accent-contrast: var(--platinum);
+  --color-border: var(--line-light);
+  --color-shadow: var(--shadow-light);
+
+  --ev-button-alt-border: transparent;
+  --ev-button-alt-text: var(--color-text);
+  --ev-button-alt-bg: var(--color-background-soft);
+  --ev-button-alt-hover-border: var(--color-border);
+  --ev-button-alt-hover-text: var(--onyx);
+  --ev-button-alt-hover-bg: color-mix(in srgb, var(--medium-blue) 8%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: var(--onyx);
+    --color-background-soft: color-mix(in srgb, var(--onyx) 94%, var(--soft-periwinkle));
+    --color-background-mute: color-mix(in srgb, var(--onyx) 88%, var(--soft-periwinkle));
+    --color-surface: color-mix(in srgb, var(--onyx) 92%, var(--medium-blue));
+
+    --color-text: color-mix(in srgb, var(--platinum) 78%, transparent);
+    --color-text-muted: color-mix(in srgb, var(--platinum) 58%, transparent);
+    --color-text-faint: color-mix(in srgb, var(--platinum) 38%, transparent);
+
+    --color-accent: var(--soft-periwinkle);
+    --color-accent-strong: var(--amethyst-smoke);
+    --color-accent-soft: var(--soft-periwinkle);
+    --color-accent-wash: color-mix(in srgb, var(--soft-periwinkle) 14%, transparent);
+    --color-accent-contrast: var(--onyx);
+    --color-border: color-mix(in srgb, var(--soft-periwinkle) 24%, transparent);
+    --color-shadow: var(--shadow-dark);
+
+    --ev-button-alt-text: var(--color-text);
+    --ev-button-alt-bg: var(--color-background-soft);
+    --ev-button-alt-hover-text: var(--platinum);
+
+    color-scheme: dark;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  font-weight: normal;
+}
+
+ul {
+  list-style: none;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--color-text);
+  background: var(--color-background);
+  line-height: 1.6;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    'Fira Sans',
+    'Droid Sans',
+    'Helvetica Neue',
+    sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Anneau de focus visible partout. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-s);
+}
+
+
+---------------------------------
+Sidebar.css :
+(NB: Elle doit être retractable, quand on retracte on fini avec un fond bleu et les icoes blanches)
+
+.sidebar {
+  margin-top: 50px;
+  width: 230px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: calc(100vh - 82px);
+  padding: 10px;
+}
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.navlien {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: 12px;
+  color: var(--color-text-muted); text-decoration: none;
+  font-size: 14px; font-weight: 500; width: 100%;
+}
+.navlien--actif {
+  background-color: #E7E8FA;
+  border-radius: 50px;
+  color: #141CC5;
+  font-weight: 500;
+}
+.navlien:hover {
+  background-color: #E7E8FA;
+  border-radius: 50px;
+  color: #141CC5;
+  font-weight: 500;
+}
+.navlien--actifs span:hover {
+  font-weight: 500;
+}
+
