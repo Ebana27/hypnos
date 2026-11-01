@@ -20,9 +20,24 @@ defaults:
     working-directory: frontend/desktop/hypnos
 
 jobs:
+  release:
+    name: Créer la release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Créer la release si elle n'existe pas
+        working-directory: .
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.HYPNOS_RELEASE }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo Ebana27/hypnos-update-history >/dev/null 2>&1 || \
+          gh release create "$GITHUB_REF_NAME" --repo Ebana27/hypnos-update-history \
+            --title "$GITHUB_REF_NAME" --notes "Version $GITHUB_REF_NAME"
+
   windows:
     name: Windows (.exe)
     runs-on: windows-latest
+    needs: release
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
@@ -53,7 +68,7 @@ jobs:
     name: macOS (.dmg)
     # Après Windows : les deux jobs ajoutent des fichiers à la MÊME release,
     # et la créer en même temps risquerait de produire deux releases.
-    needs: windows
+    needs: release
     runs-on: macos-latest
     steps:
       - name: Récupérer le code
