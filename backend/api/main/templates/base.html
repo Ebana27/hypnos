@@ -1,0 +1,177 @@
+{% load static %}<!DOCTYPE html>
+<!-- Squelette commun aux pages HTML servies par Django (accueil, 404).
+     Les deux fichiers qui l'etendent sont index.html et 404.html. -->
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Hypnos API{% endblock %}</title>
+    <link rel="icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
+    <style>
+        /* ============================================================
+           PALETTE HYPNOS
+           Memes variables que dans le site (frontend/website) et
+           l'app Electron (frontend/desktop) : une couleur changee
+           ici doit l'etre aussi la-bas.
+
+           Pas de degrade : tout est en aplats. Le style de base est
+           CLAIR ; le mode sombre n'est qu'une surcharge appliquee
+           quand l'operating system le demande.
+           ============================================================ */
+        :root {
+            --medium-blue: #141cc5;
+            --onyx: #0f110c;
+            --platinum: #ededed;
+            --amethyst-smoke: #9f86c0;
+            --soft-periwinkle: #a390e4;
+
+            /* --- Base claire --- */
+            --bg: #ffffff;
+            --bg-alt: var(--platinum);
+            --surface: #ffffff;
+            --text: color-mix(in srgb, var(--onyx) 72%, var(--platinum));
+            --text-strong: var(--onyx);
+            --border: color-mix(in srgb, var(--amethyst-smoke) 26%, transparent);
+            --accent: var(--medium-blue);
+            --accent-hover: color-mix(in srgb, var(--medium-blue) 82%, var(--onyx));
+            --accent-soft: color-mix(in srgb, var(--medium-blue) 8%, transparent);
+            --accent-contrast: var(--platinum);
+            --shadow: 0 1px 2px rgb(15 17 12 / 0.06), 0 8px 24px -16px rgb(15 17 12 / 0.25);
+
+            color-scheme: light;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: var(--onyx);
+                --bg-alt: color-mix(in srgb, var(--onyx) 92%, var(--soft-periwinkle));
+                --surface: color-mix(in srgb, var(--onyx) 94%, var(--soft-periwinkle));
+                --text: color-mix(in srgb, var(--platinum) 72%, transparent);
+                --text-strong: var(--platinum);
+                --border: color-mix(in srgb, var(--soft-periwinkle) 22%, transparent);
+                --accent: var(--soft-periwinkle);
+                --accent-hover: var(--amethyst-smoke);
+                --accent-soft: color-mix(in srgb, var(--soft-periwinkle) 14%, transparent);
+                --accent-contrast: var(--onyx);
+                --shadow: 0 24px 60px -30px rgb(0 0 0 / 0.9);
+
+                color-scheme: dark;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 48px 24px;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            color: var(--text);
+            background: var(--bg);
+        }
+
+        main {
+            width: 100%;
+            max-width: 44rem;
+            padding: 40px;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            background: var(--surface);
+            box-shadow: var(--shadow);
+        }
+
+        h1 {
+            margin: 0 0 12px;
+            font-size: 2.2rem;
+            line-height: 1.1;
+            color: var(--text-strong);
+        }
+
+        p {
+            margin: 0 0 12px;
+            line-height: 1.65;
+        }
+
+        code {
+            font-family: ui-monospace, Consolas, monospace;
+            font-size: 0.9em;
+            padding: 2px 6px;
+            border-radius: 6px;
+            color: var(--accent);
+            background: var(--accent-soft);
+        }
+
+        ul {
+            margin: 0;
+            padding-left: 1.2rem;
+            line-height: 2;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        a:hover {
+            color: var(--accent-hover);
+            text-decoration: underline;
+        }
+
+        .button {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 12px 24px;
+            border: 1px solid transparent;
+            border-radius: 999px;
+            font-weight: 600;
+            text-decoration: none;
+            color: var(--accent-contrast);
+            background: var(--accent);
+        }
+
+        .button:hover {
+            color: var(--accent-contrast);
+            background: var(--accent-hover);
+            text-decoration: none;
+        }
+
+        /* Le gros "404" de la page d'erreur. */
+        .error-code {
+            margin: 0 0 8px;
+            font-size: clamp(4rem, 14vw, 7rem);
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -4px;
+            color: var(--accent);
+        }
+
+        .error-path {
+            font-family: ui-monospace, Consolas, monospace;
+            font-size: 0.9rem;
+            color: var(--text);
+            overflow-wrap: anywhere;
+        }
+
+        .footer {
+            margin: 0;
+            font-size: 0.8rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--text);
+        }
+    </style>
+</head>
+<body>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    <p class="footer">Hypnos API</p>
+</body>
+</html>

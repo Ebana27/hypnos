@@ -17,6 +17,16 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+# Les quotas sont ecrits ici, et non importes depuis config/throttle.py.
+# Importer un module qui touche `rest_framework` pendant le chargement de
+# settings fait lire `settings.REST_FRAMEWORK` avant qu'il soit defini :
+# DRF memorise alors ses valeurs par defaut (session + basic, sans JWT) et
+# toute l'authentification par jeton devient silencieusement inoperante,
+# alors que `manage.py check` passe. Les constantes restent dans throttle.py
+# pour la documentation ; c'est la seule source de verite ici.
+QUOTA_ANONYME = "20/hour"
+QUOTA_COMPTE = "2000/hour"
+
 # python-decouple is used instead of os.environ so that the configuration can
 # live in a .env file locally and in real environment variables on CI/prod.
 # pip install python-decouple
@@ -53,6 +63,16 @@ DEBUG = config("DEBUG", default=True, cast=bool) and not os.environ.get("CI")
 # Hosts allowed to serve the site. Empty in DEBUG (localhost allowed).
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="").split(",") if not DEBUG else []
 
+# Jeton de demarrage : autorise la creation du TOUT PREMIER compte sur
+# POST /api/users/ quand la table des comptes est vide (voir
+# accounts.views.UserViewSet.creer_premier_compte).
+#
+# Volontairement sans valeur par defaut : un deploiement qui oublierait de le
+# definir garde la porte fermee plutot que d'ouvrir la creation d'un
+# superadmin a quiconqueJoint le serveur. Il n'a de sens que le temps de
+# l'installation, puis il peut etre retire de l'environnement.
+BOOTSTRAP_TOKEN = config("BOOTSTRAP_TOKEN", default="")
+
 
 """
 INSTALLED_APPS
@@ -80,25 +100,23 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.sites",
+    
     # --- Applications Hypnos ---
-    # Une application par domaine. Chaque app possede ses propres models.py,
-    # admin.py, urls.py et tests.py.
-    #   accounts     -> User : le seul compte qui peut se connecter
-    #   hotels       -> Hotel, TypeDeChambre, Chambre, Personnel
-    #   reservations -> Client, Reservation (seule app liee a hotels)
-    #   main         -> Notification + actions transverses
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    
+    # Applications spécifiques
     "accounts",
     "hotels",
     "reservations",
+    "sync",
     "main",
+    
     # --- pip install djangorestframework ---
     "rest_framework",
     # --- pip install django-cors-headers ---
     "corsheaders",
-    # --- pip install django-allauth ---
-    "allauth",
-    "allauth.account",
-    "allauth.socialaccount",
 ]
 
 # allauth social providers (allauth.socialaccount) are resolved through the
@@ -133,6 +151,22 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+
+"""
+404 PERSONNALISEE
+-----------------
+Django ignore handler404 / 404.html tant que DEBUG=True : il affiche sa page
+technique listant les motifs testes. Pour que la page 404.html (et le JSON sous
+/api/) s'affichent aussi en developpement, config/urls.py declare une derniere
+route fourre-tout qui rattrape les URL inconnues avant que Django ne les
+transforme en 404 technique.
+
+Mettre CUSTOM_404_IN_DEBUG a 0 rend la main a Django, ce qui est utile quand on
+ecrit une URL et qu'on a besoin de la liste des motifs acceptes.
+"""
+
+CUSTOM_404_IN_DEBUG = config("CUSTOM_404_IN_DEBUG", default=True, cast=bool)
 
 
 """
@@ -172,6 +206,10 @@ Role: URL routing plus the template engine needed by the admin site and by
 allauth (which renders its signup / login / password-reset forms).
 `django.template.context_processors.request` is mandatory: allauth reads
 `request` from it to build its form actions.
+
+DIRS holds the project-wide templates (BASE_DIR / "templates"). The templates
+of the applications (main/index.html, main/404.html) are found by APP_DIRS,
+which searches <app>/templates/ -- they therefore need no path here.
 """
 
 ROOT_URLCONF = "config.urls"
@@ -309,6 +347,15 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
     "DATETIME_FORMAT": "iso-8601",
+    # Quotas. Voir config/throttle.py : l'anonyme est strict parce que
+    # POST /api/demandes/ est ouvert a un visiteur sans compte, le compte
+    # authentifie est large parce que le logiciel de l'agent boucle sur
+    # l'API toute la journee.
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": QUOTA_ANONYME,
+        "compte": QUOTA_COMPTE,
+        "demande_publique": QUOTA_ANONYME,
+    },
 }
 
 
@@ -415,10 +462,18 @@ Package: Django
 Role: STATIC_URL is the public URL prefix. STATIC_ROOT is the directory that
 `python manage.py collectstatic` fills; it is required to serve the admin
 CSS/JS in production and is not itself versioned (see .gitignore).
+
+STATICFILES_DIRS is where to PUT the project-wide static files during
+development, because they live in backend/api/static/ (favicon.ico), a
+directory that is not an application and would therefore never be found.
 """
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Fichiers statiques du projet (favicon.ico...), servis par runserver en
+# developpement et recopies dans STATIC_ROOT par collectstatic.
+STATICFILES_DIRS = [BASE_DIR / "static"]
 
 
 """

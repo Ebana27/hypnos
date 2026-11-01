@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="fr-CG">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Teste API</title
+</head>
+<body>
+	<style>
+	    body {
+					background: #1ACC;
+					font-family: 'sans-serif', Arial;
+					}
+		.content-form, form {
+		    display: flex;
+			align-items: flex-start;
+			justify-content: center;
+			flex-direction: column;
+		}
+
+		.content-form {
+		    margin: 20px;
+		}
+
+		form {
+		    background: #fafafa;
+			padding: 12px;
+			border: 2px solid #0000;
+			min-width: 150px;
+			width: 280px;
+			max-width: 300px;
+			margin: 0 auto;
+		}
+
+		button {
+		    padding: 12px;
+			background: #ead;
+			color: #000;
+			border: none;
+			transition: 0.5s;
+			animation: ease;
+			min-width: 50px;
+			font-weight: 500;
+			margin: 20px;
+			margin-left: 16 px;
+		}
+		button:hover {
+		background: #000;
+		color: #ead;
+		}
+
+		label {
+		    margin: 12px 0;
+		}
+
+		input {
+		    padding: 12px;
+			/*width: 80%;*/
+			width: 200px;
+		}
+	</style>
+	<h1 style="text-align: center; color: white;">Créer un utilisateur</h1>
+	<form action="#" method="post">
+	    <div class="content-form">
+	        <label for="name">Nom : </label>
+			<input type="text" name="name" value="Nom utilisateur" placeholder="Entrer un nom utilisateur" id="name-input">
+		</div>
+        <div class="content-form">
+            <label for="password">Mot de passe : </label>
+            <input type="password" name="password" value="mot de passe" placeholder="Entrer un mot de passe fort" id="pw-input">
+        </div>
+        <button type="submit" id="btn-create-user">Créer l'utilsateur</button>
+
+        <script>
+              const nameInput = document.getElementById('name-input');
+              const pwInput = document.getElementById('pw-input');
+              const btnCreateUser = document.getElementById('btn-create-user');
+
+              // console.log(nameInput);
+              // console.log(pwInput);
+              // console.log(btnCreateUser);
+
+              aync function bodyResquest(body) {
+                
+                return body;
+              }
+
+              async function createUser(url, chemin, { methode = 'POST', corps, jeton = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkxMjg4OTExLCJpYXQiOjE3OTEyODUzMTEsImp0aSI6Ijc2YzQ3OGYxNzYzNzRiZmViN2Q1MzUxZDUzMTZkYWFiIiwidXNlcl9pZCI6IjEifQ.GHNEAl6hjXT8w_pWadGq3lhzPqRDEsXv6sKp7Bs83mU' } = {}) {
+                try {
+                  const reponse = await fetch(`${url}${chemin}`, {
+                      method: methode,
+                      headers: {
+                        'Content-Type': 'application/json',
+                        ...(jeton ? { Authorization: `Bearer ${jeton}` } : {}),
+                      },
+                      body: corps ? JSON.stringify(corps) : undefined,
+                    })
+                  const { results } = response.json();
+                  console.log(results); 
+                } catch (err) {
+                  console.error(err);
+                }
+              }
+
+              btnCreateUser.addEventListener('click', (e) => {
+                createUser('http://localhost:8000', '/api/users/', );
+              })
+        </script>
+	</form>
+</body>
+</html>

@@ -1,0 +1,53 @@
+import { useState, useEffect } from 'react'
+
+function ClientPage() {
+  const [clients, setClients] = useState([])
+
+  async function load() {
+    const data = await window.api.getClients()
+    console.log(data)
+    setClients(data)
+  }
+  
+  useEffect(() => {
+    async function load() {
+      const data = await window.api.getClients()
+      console.log(data)
+      setClients(data)
+    }
+    load()
+  }, [])
+
+  const addClient = async () => {
+    await window.api.createClient({
+      nom: 'Nkando',
+      prenom: 'Brice',
+      tel: '061234567',
+      email: 'nkandobrice@gmail.com',
+      sexe: 'M',
+      document: 'CNI',
+      preference: '',
+      loyalty: false
+    })
+    load()
+  }
+
+  return (
+    <div>
+      <h1>Page Client</h1>
+      <p>Page des détails client</p>
+
+      <div>
+        <button onClick={addClient}>Ajouter client</button>
+        {clients.map(c =>
+          <p key={c.id}>
+            {c.nom} - {c.tel}
+          </p>
+        )
+        }
+      </div>
+    </div>
+  )
+}
+
+export default ClientPage

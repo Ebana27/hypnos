@@ -16,16 +16,19 @@ class UserAdmin(BaseUserAdmin):
     """
 
     # colonnes affichees dans la liste des comptes
-    list_display = ("id_user", "username", "email", "role", "is_staff", "is_active")
-    list_filter = ("role", "is_staff", "is_superuser", "is_active")
+    list_display = (
+        "id_user", "username", "email", "role", "hotel", "is_staff", "is_active",
+    )
+    list_filter = ("role", "hotel", "is_staff", "is_superuser", "is_active")
     search_fields = ("username", "email", "first_name", "last_name")
     ordering = ("username",)
 
-    # On ajoute `role` au formulaire d'edition existant plutot que de
-    # redefinir add_fieldsets, sinon le formulaire herite perd ses champs.
+    # On ajoute `role` et `hotel` au formulaire d'edition existant plutot
+    # que de redefinir add_fieldsets, sinon le formulaire herite perd ses
+    # champs. `hotel` est requis pour tout compte non-superadmin.
     fieldsets = BaseUserAdmin.fieldsets + (
-        ("Hypnos", {"fields": ("role",)}),
+        ("Hypnos", {"fields": ("role", "hotel")}),
     )
     add_fieldsets = BaseUserAdmin.add_fieldsets + (
-        ("Hypnos", {"fields": ("email", "role")}),
+        ("Hypnos", {"fields": ("email", "role", "hotel")}),
     )

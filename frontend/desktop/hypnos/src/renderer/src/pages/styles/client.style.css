@@ -1,0 +1,79 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&family=Inter:wght@400;500&display=swap');
+
+.client-page-v2{
+  font-family: 'Outfit', Inter, sans-serif;
+  background: #fafafa;
+  min-height: 100%;
+  padding: 18px 22px;
+  border-radius: 22px;
+}
+
+/* HEADER comme screenshot */
+.client-header-v2{
+  display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;
+}
+.client-header-v2 h1{ font-size:22px; font-weight:600; color:var(--color-text); }
+.header-actions{ display:flex; gap:8px; align-items:center; }
+
+.btn-excel{
+  padding:8px 14px; border-radius:999px; border:1px solid var(--color-border);
+  background: var(--color-surface); color:var(--color-text); font-size:13px; font-weight:500;
+  display:inline-flex; gap:6px; align-items:center; cursor:pointer;
+}
+.btn-primary-v2{
+  padding:8px 16px; border-radius:999px; border:1px solid var(--medium-blue);
+  background: var(--medium-blue); color:white; font-size:13px; font-weight:600;
+  display:inline-flex; gap:6px; align-items:center; cursor:pointer;
+}
+.btn-primary-v2.full{ width:100%; justify-content:center; margin-top:12px; }
+
+.view-switch{ display:flex; background:var(--color-surface); border:1px solid var(--color-border); border-radius:999px; padding:3px; }
+.view-switch button{ width:30px; height:30px; border:none; background:none; border-radius:50%; display:grid; place-items:center; cursor:pointer; color:var(--color-text-muted); }
+.view-switch button.active{ background:var(--onyx); color:var(--platinum); }
+
+/* LISTE - exacte comme ton image */
+.client-list-v2{
+  background: var(--color-surface);
+  border:1px solid var(--color-border);
+  border-radius:16px;
+  overflow:hidden;
+}
+.client-row{
+  display:flex; align-items:center; gap:14px;
+  padding:12px 16px;
+  border-bottom:1px solid var(--color-border);
+  cursor:pointer; transition: background .15s;
+}
+.client-row:last-child{ border-bottom:none; }
+.client-row:hover{ background: var(--color-background-soft); }
+.row-avatar{
+  width:36px; height:36px; border-radius:8px;
+  background: var(--color-background-mute);
+  color: var(--color-text-muted);
+  font-size:11px; font-weight:700;
+  display:grid; place-items:center;
+}
+.row-main b{ display:block; font-size:14px; font-weight:500; color:var(--color-text); }
+.row-main span{ font-size:12px; color:var(--color-text-muted); font-family:Inter; }
+.loyal-dot{ margin-left:auto; width:8px; height:8px; border-radius:50%; background:var(--amethyst-smoke); }
+
+/* GRID - la vue carrée que tu voulais */
+.client-grid-v2{ display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:12px; }
+.client-card-v2{
+  background:var(--color-surface); border:1px solid var(--color-border); border-radius:16px;
+  padding:16px; display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer;
+}
+.client-card-v2:hover{ border-color:var(--line-strong); }
+.card-avatar{ width:48px; height:48px; border-radius:12px; background:var(--color-background-soft); display:grid; place-items:center; font-weight:700; font-size:12px; }
+
+/* MODALS */
+.modal-overlay-v2{ position:fixed; inset:0; background:rgba(15,17,12,.35); backdrop-filter:blur(4px); display:grid; place-items:center; z-index:50; }
+.modal-v2{ background:var(--color-surface); border-radius:20px; padding:18px; width:min(420px, 92vw); border:1px solid var(--color-border); box-shadow:var(--shadow-light); }
+.modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.modal-head h3{ font-weight:600; }
+.modal-head button{ border:none; background:var(--color-background-soft); width:32px; height:32px; border-radius:50%; cursor:pointer; }
+.form-grid-v2{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.form-grid-v2 input, .form-grid-v2 select{ padding:10px 12px; border-radius:10px; border:1px solid var(--color-border); background:var(--color-background-soft); font-family:Inter; font-size:13px; }
+.modal-foot{ display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+.empty-v2{ padding:20px; text-align:center; color:var(--color-text-muted); font-size:13px; }
+

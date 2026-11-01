@@ -1,0 +1,231 @@
+import { app, shell, BrowserWindow, ipcMain } from 'electron'
+// import path from 'path'
+import { join } from 'path'
+import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { eq } from 'drizzle-orm' // <-- PAS de require ! tu es en ESM
+
+import { getDb } from './db/client.js'
+import {
+  chambre,
+  client,
+  consommation,
+  demande,
+  hotel,
+  reservation,
+  service,
+  typeDeChambre,
+  user
+} from './db/schema/schema.js'
+
+let onboardingWindow = null
+let loginWindow = null
+let mainWindow = null
+
+const db = getDb()
+
+function loadRenderer(win, flag = null) {
+  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    const base = process.env['ELECTRON_RENDERER_URL']
+    win.loadURL(flag ? `${base}?${flag}=1` : base)
+  } else {
+    win.loadFile(join(__dirname, '../renderer/index.html'), flag ? { query: { [flag]: '1' } } : {})
+  }
+}
+
+function createOnboardingWindow() {
+  onboardingWindow = new BrowserWindow({
+    width: 720, height: 300, frame: false, resizable: false, maximizable: false, fullscreenable: false,
+    webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false }
+  })
+  loadRenderer(onboardingWindow, 'onboarding')
+  onboardingWindow.on('closed', () => { onboardingWindow = null })
+}
+
+function createLoginWindow() {
+  loginWindow = new BrowserWindow({
+    width: 1000, height: 650, frame: true, resizable: false, maximizable: false, fullscreenable: false,
+    webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false }
+  })
+  loadRenderer(loginWindow, 'login')
+  loginWindow.on('closed', () => { loginWindow = null })
+}
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1080, height: 670, fullscreenable: true, maximizable: true, frame: false, autoHideMenuBar: true, resizable: true, minimizable: true,
+    backgroundColor: '#d9cde3',
+    titleBarOverlay: { color: '#000000', symbolColor: '#1A1A1A', height: 32 },
+    webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false }
+  })
+
+  mainWindow.removeMenu()
+  
+  mainWindow.on('ready-to-show', () => { mainWindow.maximize(); mainWindow.show() })
+  mainWindow.on('closed', () => { mainWindow = null })
+  mainWindow.webContents.setWindowOpenHandler((details) => { shell.openExternal(details.url); return { action: 'deny' } })
+  loadRenderer(mainWindow)
+}
+
+ipcMain.on('window:minimize', (e) => BrowserWindow.fromWebContents(e.sender)?.minimize())
+ipcMain.on('window:close', (e) => BrowserWindow.fromWebContents(e.sender)?.close())
+ipcMain.on('window:maximize', (e) => {
+  BrowserWindow.fromWebContents(e.sender)?.maximize()
+  if (!mainWindow) return 
+  if (mainWindow.isMaxized()) mainWindow.unmaximize()
+  else mainWindow.maximize()
+})
+ipcMain.on('onboarding:done', () => { if (!loginWindow && !mainWindow) createLoginWindow(); if (onboardingWindow) onboardingWindow.close() })
+ipcMain.on('login:done', () => { if (!mainWindow) createWindow(); if (loginWindow) loginWindow.close() })
+
+app.whenReady().then(() => {
+  electronApp.setAppUserModelId('com.hypnos.app')
+  app.on('browser-window-created', (_, window) => { optimizer.watchWindowShortcuts(window) })
+  createOnboardingWindow()
+  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createOnboardingWindow() })
+})
+app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
+
+// ==================== CRUD ====================
+
+// CREATE - Tu avais bon, je corrige juste chambre
+ipcMain.handle('clients:create', async (_, data) => {
+  const newClient = { nom: data.nom, prenom: data.prenom, tel: data.tel, email: data.email, sexe: data.sexe, document: data.document, preference: data.preference, loyalty: data.loyalty }
+  const result = await db.insert(client).values(newClient).returning()
+  return result[0]
+})
+ipcMain.handle('typechambre:create', async (_, data) => {
+  const newTypeRoom = { remoteId: data.remoteId, label: data.label, prix: data.prix, capacite: data.capacite }
+  const result = await db.insert(typeDeChambre).values(newTypeRoom).returning()
+  return result[0]
+})
+ipcMain.handle('chambre:create', async (_, data) => {
+  if (!data.typeId) throw new Error('Il faut choisir un type de chambre.')
+  const typeExiste = await db.query.typeDeChambre.findFirst({ where: (t, { eq }) => eq(t.id, Number(data.typeId)) })
+  if (!typeExiste) throw new Error("Ce type de chambre n'existe pas")
+  const newRoom = { remoteId: data.remoteId, label: data.label, numero: data.numero, typeId: Number(data.typeId), etage: data.etage, statut: data.statut }
+  const result = await db.insert(chambre).values(newRoom).returning()
+  return result[0]
+})
+
+// READ - LECTURE TOTALE
+function lectureTotale(pseudoOfChanel, message, table) {
+  ipcMain.handle(`${pseudoOfChanel}:getAll`, async () => {
+    console.log(message)
+    return await db.select().from(table)
+  })
+}
+lectureTotale('clients', 'Lire tout les clients', client)
+lectureTotale('demande', 'Lire toutes les demandes', demande)
+lectureTotale('reservation', 'Lire toutes les reservations', reservation)
+lectureTotale('hotel', 'Lire infos hotel', hotel)
+lectureTotale('utilisateur', 'Lire utilisateurs', user)
+lectureTotale('service', 'Lire services', service)
+lectureTotale('consommation', 'Lire consommations', consommation)
+lectureTotale('chambre', 'Lire chambres', chambre)
+lectureTotale('typedechambre', 'Lire types chambres', typeDeChambre)
+
+// READ - LECTURE DETAILLEE (CORRIGEE)
+function lectureDetaillee(pseudoDuChanel, message, table) {
+  ipcMain.handle(`${pseudoDuChanel}:getById`, async (event, id) => { // tu avais aync
+    console.log(message, id)
+    const result = await db.select().from(table).where(eq(table.id, Number(id)))
+    return result[0] || null
+  })
+}
+lectureDetaillee('clients', 'Lire un Client précis', client)
+lectureDetaillee('demande', 'Lire une demande précise', demande)
+lectureDetaillee('reservation', 'Lire une reservation précise', reservation)
+lectureDetaillee('hotel', 'Lire un hotel précis', hotel)
+lectureDetaillee('utilisateur', 'Lire un utilisateur précis', user)
+lectureDetaillee('service', 'Lire un service précis', service)
+lectureDetaillee('consommation', 'Lire une consommation précise', consommation)
+lectureDetaillee('chambre', 'Lire une chambre précise', chambre)
+lectureDetaillee('typedechambre', 'Lire un type de chambre précis', typeDeChambre)
+
+// UPDATE - TOUTES TES TABLES EN UNE FOIS
+function miseAJour(pseudoDuChanel, message, table) {
+  ipcMain.handle(`${pseudoDuChanel}:update`, async (event, id, data) => {
+    console.log(message, id)
+    const { id: _id, ...dataToUpdate } = data // on n'écrase pas l'id
+    const result = await db.update(table).set(dataToUpdate).where(eq(table.id, Number(id))).returning()
+    return result[0]
+  })
+}
+miseAJour('clients', 'Mettre à jour client', client)
+miseAJour('demande', 'Mettre à jour demande', demande)
+miseAJour('reservation', 'Mettre à jour reservation', reservation)
+miseAJour('hotel', 'Mettre à jour hotel', hotel)
+miseAJour('utilisateur', 'Mettre à jour utilisateur', user)
+miseAJour('service', 'Mettre à jour service', service)
+miseAJour('consommation', 'Mettre à jour consommation', consommation)
+miseAJour('chambre', 'Mettre à jour chambre', chambre)
+miseAJour('typedechambre', 'Mettre à jour type chambre', typeDeChambre)
+
+// DELETE - TOUTES TES TABLES
+function suppression(pseudoDuChanel, message, table) {
+  ipcMain.handle(`${pseudoDuChanel}:delete`, async (event, id) => {
+    console.log(message, id)
+    await db.delete(table).where(eq(table.id, Number(id)))
+    return { success: true }
+  })
+}
+suppression('clients', 'Supprimer client', client)
+suppression('demande', 'Supprimer demande', demande)
+suppression('reservation', 'Supprimer reservation', reservation)
+suppression('hotel', 'Supprimer hotel', hotel)
+suppression('utilisateur', 'Supprimer utilisateur', user)
+suppression('service', 'Supprimer service', service)
+suppression('consommation', 'Supprimer consommation', consommation)
+suppression('chambre', 'Supprimer chambre', chambre)
+suppression('typedechambre', 'Supprimer type chambre', typeDeChambre)
+
+
+-------------
+
+import { contextBridge, ipcRenderer } from 'electron'
+import { electronAPI } from '@electron-toolkit/preload'
+
+// API complète pour tout ton app
+const api = {
+  // -------- Fenêtre --------
+  minimize: () => ipcRenderer.send('window:minimize'),
+  maximize: () => ipcRenderer.send('window:maximize'),
+  close: () => ipcRenderer.send('window:close'),
+  onboardingDone: () => ipcRenderer.send('onboarding:done'),
+  loginDone: () => ipcRenderer.send('login:done'),
+
+  // -------- GENERIC CRUD (ce qu'on utilise maintenant) --------
+  getAll: (table) => ipcRenderer.invoke(`${table}:getAll`),
+  getById: (table, id) => ipcRenderer.invoke(`${table}:getById`, id),
+  getFull: (table, id) => ipcRenderer.invoke(`${table}:getFullDetails`, id),
+  create: (table, data) => ipcRenderer.invoke(`${table}:create`, data),
+  update: (table, id, data) => ipcRenderer.invoke(`${table}:update`, id, data),
+  remove: (table, id) => ipcRenderer.invoke(`${table}:delete`, id),
+
+  // -------- LEGACY (pour que ton ancien code ne casse pas) --------
+  getClients: () => ipcRenderer.invoke('clients:getAll'),
+  createClient: (data) => ipcRenderer.invoke('clients:create', data),
+  getClientById: (id) => ipcRenderer.invoke('clients:getById', id),
+  updateClient: (id, data) => ipcRenderer.invoke('clients:update', id, data),
+  deleteClient: (id) => ipcRenderer.invoke('clients:delete', id),
+
+  // Tu peux ajouter les autres pareil si besoin
+  getChambres: () => ipcRenderer.invoke('chambre:getAll'),
+  getReservations: () => ipcRenderer.invoke('reservation:getAll'),
+}
+
+if (process.contextIsolated) {
+  try {
+    contextBridge.exposeInMainWorld('electron', electronAPI)
+    contextBridge.exposeInMainWorld('electronAPI', api) // <-- C'EST CELUI QUE TA ClientPage UTILISE
+    contextBridge.exposeInMainWorld('api', api) // compatibilité avec window.api
+    contextBridge.exposeInMainWorld('windowControls', api) // compatibilité avec ton ancien code
+  } catch (error) {
+    console.error(error)
+  }
+} else {
+  window.electron = electronAPI
+  window.electronAPI = api
+  window.api = api
+  window.windowControls = api
+}

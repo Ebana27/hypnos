@@ -61,31 +61,80 @@ class ChambreRulesTests(TestCase):
 
 
 class PersonnelTests(TestCase):
+    """
+    L'employe EST le compte.
+
+    Personnel ne porte plus ni `hotel` ni `nom`/`prenom` : tout vient de
+    `user`. C'est ce qui rend impossible desynchroniser un compte et sa
+    fiche employe.
+    """
+
     @classmethod
     def setUpTestData(cls):
+        from accounts.models import User
+
         cls.hotel = Hotel.objects.create(
             name="H", adresse="a", ville="v", tel="t", email="e@h.dev",
             nombre_etages=2, nombre_chambres=0,
         )
-
-    def test_personnel_without_account_is_allowed(self):
-        # Un employe peut ne pas avoir de compte technique.
-        p = Personnel.objects.create(
-            hotel=self.hotel, nom="Durand", prenom="Paul",
-            sexe="M", poste="Agent de nuit",
+        cls.user = User.objects.create_user(
+            username="durand", email="durand@h.dev", password="p",
+            hotel=cls.hotel, first_name="Paul", last_name="Durand",
         )
-        self.assertIsNone(p.user)
 
-    def test_deleting_account_keeps_personnel(self):
-        # on_delete=SET_NULL : la fiche employe survit au compte.
+    def test_personnel_must_have_an_account(self):
+        # Regle : tout employe a un compte. Un compte sans employe reste
+        # possible (agent plateforme), l'inverse non.
+        p = Personnel.objects.create(
+            user=self.user, sexe="M", poste="Agent de nuit"
+        )
+        self.assertEqual(p.user, self.user)
+
+    def test_account_without_personnel_record_is_allowed(self):
+        # Un compte n'a PAS besoin d'une fiche employe : c'est l'inverse
+        # qui est interdit.
         from accounts.models import User
 
-        user = User.objects.create_user(username="p", email="p@h.dev", password="p")
-        p = Personnel.objects.create(
-            user=user, hotel=self.hotel, nom="Roux", prenom="Léa",
-            sexe="F", poste="Reception",
+        autre = User.objects.create_user(
+            username="solo", email="solo@h.dev", password="p", hotel=self.hotel
         )
-        user.delete()
-        p.refresh_from_db()
-        self.assertIsNone(p.user)
-        self.assertEqual(p.nom, "Roux")
+        self.assertFalse(hasattr(autre, "personnel"))
+
+    def test_hotel_nom_come_from_the_account(self):
+        p = Personnel.objects.create(
+            user=self.user, sexe="M", poste="Reception"
+        )
+        # Proprietes de lecture : aucune colonne dupliquee.
+        self.assertEqual(p.hotel, self.hotel)
+        self.assertEqual(p.hotel_id, self.hotel.hotel_id)
+        self.assertEqual(p.nom, "Durand")
+        self.assertEqual(p.prenom, "Paul")
+
+    def test_name_cannot_diverge_from_the_account(self):
+        # C'est tout l'interet de la suppression des colonnes : il n'existe
+        # aucun moyen d'avoir p.nom != user.last_name.
+        concret = {f.name for f in Personnel._meta.get_fields()}
+        for absent in ("nom", "prenom", "hotel"):
+            # aucune colonne...
+            self.assertNotIn(absent, concret)
+            # ... mais une propriete de lecture, donc utilisable en template
+            self.assertIsInstance(getattr(Personnel, absent), property)
+
+    def test_query_must_go_through_the_user_relation(self):
+        # Une propriete n'existe pas en SQL : le filtre passe par user__.
+        p = Personnel.objects.create(
+            user=self.user, sexe="M", poste="Reception"
+        )
+        self.assertEqual(
+            Personnel.objects.filter(user__hotel=self.hotel).count(), 1
+        )
+        with self.assertRaises(Exception):
+            Personnel.objects.filter(hotel=self.hotel).count()
+
+    def test_deleting_account_is_blocked(self):
+        # on_delete=PROTECT : on ne perd pas un employe en cours d'activite.
+        from django.db.models import ProtectedError
+
+        Personnel.objects.create(user=self.user, sexe="M", poste="Reception")
+        with self.assertRaises(ProtectedError):
+            self.user.delete()

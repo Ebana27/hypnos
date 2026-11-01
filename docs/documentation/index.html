@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documentation Hypnos</title>
+
+<!--
+  Lecteur de documentation.
+
+  Le HTML ne CONTIENT pas le texte : il lit `api.md` au chargement et le met
+  en forme. Le `.md` reste la source de vérité, donc il se versionne et se
+  relit dans une revue de code ; le HTML n'est qu'une façon de le lire.
+
+  Ouvrir ce fichier en double-cliquant ne fonctionnera pas : le navigateur
+  bloque `fetch()` sur `file://`. Il faut servir le dossier :
+
+      cd docs
+      python -m http.server 8000
+      # puis http://localhost:8000
+
+  Palette et typographie reprises de `backend/api/main/templates/base.html` :
+  onyx, platine, bleu médium, améthyste, pervenche.
+-->
+
+<style>
+:root {
+  color-scheme: light;
+
+  --onyx: #0f110c;
+  --platinum: #ededed;
+  --medium-blue: #141cc5;
+  --amethyst-smoke: #9f86c0;
+  --soft-periwinkle: #a390e4;
+
+  --bg: #ffffff;
+  --bg-alt: var(--platinum);
+  --surface: #ffffff;
+  --text: color-mix(in srgb, var(--onyx) 72%, var(--platinum));
+  --text-strong: var(--onyx);
+  --border: color-mix(in srgb, var(--amethyst-smoke) 26%, transparent);
+  --accent: var(--medium-blue);
+  --accent-hover: color-mix(in srgb, var(--medium-blue) 82%, var(--onyx));
+  --accent-soft: color-mix(in srgb, var(--medium-blue) 8%, transparent);
+  --accent-contrast: var(--platinum);
+  --shadow: 0 1px 2px rgb(15 17 12 / 0.06), 0 8px 24px -16px rgb(15 17 12 / 0.25);
+
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+
+  --max: 1180px;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: var(--onyx);
+  --bg-alt: color-mix(in srgb, var(--onyx) 92%, var(--soft-periwinkle));
+  --surface: color-mix(in srgb, var(--onyx) 94%, var(--soft-periwinkle));
+  --text: color-mix(in srgb, var(--platinum) 72%, transparent);
+  --text-strong: var(--platinum);
+  --border: color-mix(in srgb, var(--soft-periwinkle) 22%, transparent);
+  --accent: var(--soft-periwinkle);
+  --accent-hover: var(--amethyst-smoke);
+  --accent-soft: color-mix(in srgb, var(--soft-periwinkle) 14%, transparent);
+  --accent-contrast: var(--onyx);
+  --shadow: 0 24px 60px -30px rgb(0 0 0 / 0.9);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  min-height: 100vh;
+  background: var(--bg-alt);
+  color: var(--text);
+  font: 400 16px/1.65 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--accent); color: var(--accent-contrast); }
+
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { color: var(--accent-hover); }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+/* ---------- Barre du haut ---------- */
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem clamp(16px, 4vw, 32px);
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+
+.bar__title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+
+.bar__spacer { flex: 1; }
+
+.bar__status {
+  font: 400 12px/1 var(--mono);
+  color: var(--text);
+  opacity: 0.7;
+}
+
+input[type="search"] {
+  width: min(280px, 42vw);
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-strong);
+  font: 400 14px var(--sans);
+}
+input[type="search"]::placeholder { color: var(--text); opacity: 0.6; }
+
+.toggle {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-strong);
+  font: 400 12px var(--sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 0.35s var(--ease), color 0.35s var(--ease);
+}
+.toggle:hover { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); }
+
+/* ---------- Mise en page ---------- */
+
+.shell {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: clamp(20px, 4vw, 56px);
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: clamp(20px, 4vw, 44px) clamp(16px, 4vw, 32px) 96px;
+}
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; }
+  .sommaire { position: static; max-height: none; border-right: 0; border-bottom: 1px solid var(--border); padding-bottom: 1.2rem; }
+}
+
+/* ---------- Sommaire ---------- */
+
+.sommaire__label {
+  font: 600 11px/1 var(--sans);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.9rem;
+}
+
+.sommaire a {
+  display: block;
+  padding: 0.32rem 0 0.32rem 0.7rem;
+  border-left: 2px solid transparent;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+.sommaire a:hover { color: var(--accent); border-left-color: var(--border); }
+.sommaire a.actif { color: var(--accent); border-left-color: var(--accent); font-weight: 500; }
+.sommaire a.niv3 { padding-left: 1.5rem; font-size: 13px; }
+
+/* ---------- Contenu ---------- */
+
+.contenu { min-width: 0; }
+
+.contenu > h1 {
+  font-size: clamp(1.9rem, 4.2vw, 2.9rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+  margin-bottom: 1.4rem;
+}
+
+.contenu h2 {
+  font-size: clamp(1.35rem, 2.6vw, 1.75rem);
+  line-height: 1.2;
+  color: var(--text-strong);
+  margin: 3.2rem 0 1rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--border);
+  scroll-margin-top: 76px;
+}
+
+.contenu h3 {
+  font-size: 1.1rem;
+  color: var(--text-strong);
+  margin: 2rem 0 0.6rem;
+  scroll-margin-top: 76px;
+}
+
+.contenu p, .contenu li { color: var(--text); }
+.contenu p { margin: 0 0 1rem; max-width: 74ch; }
+.contenu ul, .contenu ol { margin: 0 0 1.1rem; padding-left: 1.4rem; max-width: 74ch; }
+.contenu li { margin: 0.3rem 0; }
+.contenu li::marker { color: var(--accent); }
+
+.contenu strong { color: var(--text-strong); font-weight: 600; }
+
+.contenu hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 2.4rem 0;
+}
+
+.contenu blockquote {
+  margin: 1.2rem 0;
+  padding: 0.9rem 1.2rem;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 0 8px 8px 0;
+  max-width: 74ch;
+}
+.contenu blockquote p { margin: 0; }
+
+.contenu code {
+  font: 400 0.875em/1.5 var(--mono);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  color: var(--text-strong);
+}
+
+.contenu pre {
+  position: relative;
+  margin: 1.2rem 0 1.5rem;
+  padding: 1.1rem 1.2rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+}
+.contenu pre code {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-strong);
+  white-space: pre;
+}
+
+.copier {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: 400 11px var(--sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.25s var(--ease);
+}
+.contenu pre:hover .copier, .copier:focus-visible { opacity: 1; }
+.copier:hover { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); }
+
+/* ---------- Tableaux ---------- */
+
+.tableau {
+  margin: 1.2rem 0 1.6rem;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.contenu table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+.contenu th, .contenu td {
+  padding: 0.65rem 0.9rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.contenu th {
+  background: var(--bg-alt);
+  color: var(--text-strong);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.contenu tbody tr:last-child td { border-bottom: 0; }
+.contenu tbody tr:hover { background: var(--accent-soft); }
+
+/* ---------- Recherche ---------- */
+
+.survol { background: color-mix(in srgb, var(--amethyst-smoke) 45%, transparent); border-radius: 3px; }
+
+.fiche[hidden] { display: none; }
+
+.vide {
+  margin: 2rem 0;
+  padding: 1.2rem;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  text-align: center;
+  color: var(--text);
+}
+
+.erreur {
+  margin: 2rem 0;
+  padding: 1.4rem;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--text-strong);
+}
+.erreur h2 { margin: 0 0 0.6rem; padding: 0; border: 0; font-size: 1.1rem; }
+.erreur pre { margin: 0.8rem 0 0; }
+.erreur code { background: none; border: 0; padding: 0; }
+</style>
+</head>
+
+<body>
+<header class="bar">
+  <span class="bar__title">Hypnos</span>
+  <span class="bar__status" id="statut">chargement…</span>
+  <span class="bar__spacer"></span>
+  <input type="search" id="filtre" placeholder="Filtrer…" aria-label="Filtrer la documentation">
+  <button class="toggle" id="theme">Sombre</button>
+</header>
+
+<main class="shell">
+  <nav class="sommaire" aria-label="Sommaire">
+    <p class="sommaire__label">Sommaire</p>
+    <div id="sommaire"></div>
+  </nav>
+  <article class="contenu" id="contenu"></article>
+</main>
+
+<script>
+/* ============================================================================
+   Rendu Markdown -> HTML
+
+   Écrit à la main, sans dépendance : le dossier reste lisible hors ligne et
+   aucune librairie n'a besoin d'être installée ou mise à jour. Le `.md` de ce
+   dépôt n'utilise que ce que cette fonction sait faire — et c'est tout le
+   Markdown que le fichier d'API contient aujourd'hui.
+
+   Si le document commence un jour à utiliser une syntaxe absente ici, elle
+   s'affichera telle quelle plutôt que de disparaitre : mieux vaut voir le
+   texte brut qu'une page vide.
+   ========================================================================= */
+
+const echapper = (s) => s
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;');
+
+/** Code inline : `x` -> <code>x</code>, avant le gras pour qu'il soit protégé. */
+function codeInline(texte) {
+  return texte.replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
+function GrasEtLiens(texte) {
+  return texte
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,
+             (_, texte, href) => `<a href="${href}">${texte}</a>`);
+}
+
+/** Les blocs de code sont sortis avant tout traitement, pour rester intacts. */
+function extraireBlocs(source) {
+  const blocs = [];
+  const texte = source.replace(/^```(\w*)\n([\s\S]*?)^```[ \t]*$/gm, (_, lang, code) => {
+    blocs.push({ lang, code });
+    return `\u0000BLOC${blocs.length - 1}\u0000`;
+  });
+  return { texte, blocs };
+}
+
+function blocHtml({ lang, code }) {
+  const etiquette = lang ? `<code data-lang="${echapper(lang)}">` : '<code>';
+  return `<pre><button class="copier" type="button">Copier</button>${etiquette}${echapper(code.replace(/\n$/, ''))}</code></pre>`;
+}
+
+function renderiser(source) {
+  const { texte, blocs } = extraireBlocs(source);
+  const lignes = echapper(texte).split('\n');
+  const sortie = [];
+  let i = 0;
+
+  const vide = () => i < lignes.length && lignes[i].trim() === '';
+
+  while (i < lignes.length) {
+    if (vide()) { i++; continue; }
+
+    /* --- Bloc de code restitué --- */
+    if (lignes[i].startsWith('\u0000BLOC')) {
+      const index = Number(lignes[i].match(/BLOC(\d+)/)[1]);
+      sortie.push(blocHtml(blocs[index]));
+      i++;
+      continue;
+    }
+
+    /* --- Titres --- */
+    const titre = lignes[i].match(/^(#{1,4})\s+(.*)$/);
+    if (titre) {
+      const niveau = titre[1].length;
+      const contenu = GrasEtLiens(codeInline(titre[2].trim()));
+      sortie.push(`<h${niveau}>${contenu}</h${niveau}>`);
+      i++;
+      continue;
+    }
+
+    /* --- Filet --- */
+    if (/^(-{3,}|\*{3,})\s*$/.test(lignes[i])) {
+      sortie.push('<hr>');
+      i++;
+      continue;
+    }
+
+    /* --- Citation --- */
+    if (lignes[i].startsWith('&gt; ')) {
+      const citation = [];
+      while (i < lignes.length && (lignes[i].startsWith('&gt; ') || lignes[i].trim() === '')) {
+        if (lignes[i].trim() === '' && !lignes[i + 1]?.startsWith('&gt; ')) break;
+        citation.push(lignes[i].replace(/^&gt;\s?/, ''));
+        i++;
+      }
+      sortie.push(`<blockquote><p>${GrasEtLiens(codeInline(citation.join(' ')))}</p></blockquote>`);
+      continue;
+    }
+
+    /* --- Tableau : une ligne d'en-tête puis un séparateur --- */
+    if (lignes[i].includes('|') && /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(lignes[i + 1] || '')) {
+      const cellules = (l) => l.replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+      const entete = cellules(lignes[i]);
+      i += 2;
+      const corps = [];
+      while (i < lignes.length && lignes[i].includes('|') && lignes[i].trim()) {
+        corps.push(cellules(lignes[i]));
+        i++;
+      }
+      sortie.push(
+        '<div class="tableau"><table><thead><tr>'
+        + entete.map((c) => `<th>${GrasEtLiens(codeInline(c))}</th>`).join('')
+        + '</tr></thead><tbody>'
+        + corps.map((r) => '<tr>' + r.map((c) => `<td>${GrasEtLiens(codeInline(c))}</td>`).join('') + '</tr>').join('')
+        + '</tbody></table></div>'
+      );
+      continue;
+    }
+
+    /* --- Listes --- */
+    if (/^\s*([-*+]|\d+\.)\s+/.test(lignes[i])) {
+      const ordonnee = /^\s*\d+\.\s+/.test(lignes[i]);
+      const items = [];
+      // Une ligne non indentée qui suit un élément est une suite de cet
+      // élément — sauf si elle rouvre un autre bloc, auquel cas la liste
+      // s'arrête. Sans cette garde, un `## Titre` collé sous une liste se
+      // retrouve dans la puce au lieu de suivre.
+      const debutBloc = /^(#{1,4}\s|&gt;|\u0000BLOC|(-{3,}|\*{3,})\s*$)/;
+      while (i < lignes.length && lignes[i].trim()) {
+        if (/^\s*([-*+]|\d+\.)\s+/.test(lignes[i])) {
+          items.push(lignes[i].replace(/^\s*([-*+]|\d+\.)\s+/, ''));
+        } else if (items.length && !debutBloc.test(lignes[i]) && !/^\s{4}/.test(lignes[i])) {
+          items[items.length - 1] += ' ' + lignes[i].trim();
+        } else {
+          break;
+        }
+        i++;
+      }
+      const balise = ordonnee ? 'ol' : 'ul';
+      sortie.push(`<${balise}>` + items.map((t) => `<li>${GrasEtLiens(codeInline(t))}</li>`).join('') + `</${balise}>`);
+      continue;
+    }
+
+    /* --- Paragraphe : jusqu'à la ligne vide --- */
+    const paragraphe = [];
+    while (i < lignes.length && !vide() && !/^(#{1,4}\s|>|\u0000BLOC)/.test(lignes[i])
+           && !/^(-{3,}|\*{3,})\s*$/.test(lignes[i])
+           && !/^\s*([-*+]|\d+\.)\s+/.test(lignes[i])) {
+      paragraphe.push(lignes[i]);
+      i++;
+    }
+    if (paragraphe.length) {
+      sortie.push(`<p>${GrasEtLiens(codeInline(paragraphe.join(' ')))}</p>`);
+    }
+  }
+
+  return sortie.join('\n');
+}
+
+/* ============================================================================
+   Page : chargement du .md, sommaire, filtre, thème
+   ========================================================================= */
+
+const contenu = document.getElementById('contenu');
+const sommaire = document.getElementById('sommaire');
+const statut = document.getElementById('statut');
+const filtre = document.getElementById('filtre');
+
+/**
+ * Découpe le HTML rendu en sections, une par titre de niveau 2 ou 3.
+ *
+ * C'est ce découpage qui rend la filtration possible : le filtre masque des
+ * blocs entiers, pas des lignes de texte. Sans lui, chercher « bootstrap »
+ * surlignerait le mot dans les dix sections au lieu d'en laisser une seule
+ * à l'écran.
+ */
+function decouper(html) {
+  const modele = /<h([23])>(.*?)<\/h\1>([\s\S]*?)(?=<h[23]>|$)/g;
+  const sections = [];
+  let coupe;
+  while ((coupe = modele.exec(html)) !== null) {
+    sections.push({
+      niveau: coupe[1],
+      titre: coupe[2].replace(/<[^>]+>/g, ''),
+      contenu: coupe[0],
+    });
+  }
+  return sections;
+}
+
+let sections = [];
+let fiches = [];
+
+function surligner(terme) {
+  contenu.querySelectorAll('.survol').forEach((n) => {
+    n.replaceWith(document.createTextNode(n.textContent));
+  });
+  if (terme.length < 2) return;
+  const motif = new RegExp('(' + terme.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+  const parcourus = new Set();
+  const Ignoring = /^(SCRIPT|STYLE)$/;
+  const arbre = document.createTreeWalker(contenu, NodeFilter.SHOW_TEXT, {
+    acceptNode: (noeud) => {
+      if (Ignoring.has(noeud.parentNode?.nodeName) || parcourus.has(noeud.parentNode)) {
+        return NodeFilter.FILTER_REJECT;
+      }
+      parcourus.add(noeud.parentNode);
+      return noeud.nodeValue.match(motif) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    },
+  });
+  const cibles = [];
+  while (arbre.nextNode()) cibles.push(arbre.currentNode);
+  cibles.forEach((noeud) => {
+    const fragment = document.createDocumentFragment();
+    noeud.nodeValue.split(motif).forEach((partie, index) => {
+      fragment.append(index % 2
+        ? Object.assign(document.createElement('mark'), { className: 'survol', textContent: partie })
+        : document.createTextNode(partie));
+    });
+    noeud.replaceWith(fragment);
+  });
+}
+
+/**
+ * Le filtre porte sur les fiches, pas sur les titres.
+ *
+ * Un `h3` partage sa fiche avec le `h2` qui le précède : si l'on masquait la
+ * fiche entière selon le seul contenu du `h3`, la sous-section trouvée
+ * disparaîtrait avec son parent. On garde donc une fiche dès qu'une seule de
+ * ses sections correspond.
+ */
+function filtrer() {
+  const terme = filtre.value.trim().toLowerCase();
+  let visibles = 0;
+
+  fiches.forEach((fiche) => {
+    const garder = !terme || fiche.texte.includes(terme);
+    fiche.el.hidden = !garder;
+    if (garder) visibles++;
+  });
+
+  let vide = document.getElementById('vide');
+  if (terme && visibles === 0) {
+    if (!vide) {
+      vide = document.createElement('p');
+      vide.id = 'vide';
+      vide.className = 'vide';
+      contenu.appendChild(vide);
+    }
+    vide.textContent = `Aucune section ne contient « ${filtre.value.trim()} ».`;
+    vide.hidden = false;
+  } else if (vide) {
+    vide.hidden = true;
+  }
+
+  statut.textContent = terme
+    ? `${visibles}/${fiches.length} sections`
+    : `${fiches.length} sections`;
+}
+
+filtre.addEventListener('input', () => {
+  filtrer();
+  surligner(filtre.value.trim());
+});
+
+/* Le thème suit l'OS tant que la personne ne tranche pas elle-même. */
+const themeBouton = document.getElementById('theme');
+const themePrefere = matchMedia('(prefers-color-scheme: dark)');
+
+function appliquerTheme(sombre) {
+  document.documentElement.dataset.theme = sombre ? 'dark' : 'light';
+  themeBouton.textContent = sombre ? 'Clair' : 'Sombre';
+}
+appliquerTheme(themePrefere.matches);
+themePrefere.addEventListener('change', (e) => appliquerTheme(e.matches));
+themeBouton.addEventListener('click', () => {
+  appliquerTheme(document.documentElement.dataset.theme !== 'dark');
+});
+
+/* Souligne la section affichée dans le sommaire. */
+const observateur = new IntersectionObserver((entrees) => {
+  entrees.forEach((entree) => {
+    if (!entree.isIntersecting) return;
+    sommaire.querySelectorAll('a').forEach((a) =>
+      a.classList.toggle('actif', a.dataset.cible === entree.target.id));
+  });
+}, { rootMargin: '-76px 0px -70% 0px' });
+
+/* Bouton « copier » sur chaque bloc de code. */
+contenu.addEventListener('click', async (evenement) => {
+  const bouton = evenement.target.closest('.copier');
+  if (!bouton) return;
+  const code = bouton.parentElement.querySelector('code').textContent;
+  try {
+    await navigator.clipboard.writeText(code);
+    bouton.textContent = 'Copié';
+  } catch {
+    bouton.textContent = 'Échec';
+  }
+  setTimeout(() => { bouton.textContent = 'Copier'; }, 1400);
+});
+
+/* ---------- Chargement ---------- */
+
+const origine = new URLSearchParams(location.search).get('doc') || 'api.md';
+
+fetch(origine)
+  .then((r) => {
+    if (!r.ok) throw new Error(`${origine} — HTTP ${r.status}`);
+    return r.text();
+  })
+.then((markdown) => {
+    document.title = `Hypnos — ${origine}`;
+    contenu.innerHTML = renderiser(markdown);
+
+    const titre = contenu.querySelector('h1');
+    sections = decouper(contenu.innerHTML).map((s) => ({ ...s, ancre: '', el: null }));
+
+    // Le titre de niveau 1 n'appartient à aucune section : il reste seul en
+    // tête de page.
+    contenu.innerHTML = '';
+    if (titre) contenu.appendChild(titre);
+
+    let ficheCourante = null;
+    sections.forEach((section, index) => {
+      // Un titre de niveau 3 qui suit un niveau 2 est la sous-section de ce
+      // dernier : ils partagent une fiche, sinon le filtre masquerait le
+      // parent en laissant l'enfant à l'écran.
+      if (section.niveau === '2' || !ficheCourante) {
+        const fiche = document.createElement('section');
+        fiche.className = 'fiche';
+        fiche.id = 'section-' + index;
+        contenu.appendChild(fiche);
+        section.el = fiche;
+        ficheCourante = { el: fiche, texte: '' };
+        fiches.push(ficheCourante);
+      } else {
+        section.el = ficheCourante.el;
+      }
+
+      section.ancre = section.el.id;
+      section.el.insertAdjacentHTML('beforeend', section.contenu);
+      observateur.observe(section.el);
+    });
+
+    // Le texte de recherche est pris après insertion : il faut le texte
+    // visible, titres et codes compris, pas le HTML.
+    fiches.forEach((fiche) => { fiche.texte = fiche.el.textContent.toLowerCase(); });
+
+    // Sommaire : un lien par titre, indenté pour les sous-sections.
+    sections.forEach((section) => {
+      const lien = document.createElement('a');
+      lien.href = '#' + section.ancre;
+      lien.textContent = section.titre;
+      lien.dataset.cible = section.ancre;
+      if (section.niveau === '3') lien.className = 'niv3';
+      sommaire.appendChild(lien);
+    });
+
+    filtrer();
+    statut.textContent = origine;
+  })
+  .catch((erreur) => {
+    // Le cas le plus probable : le fichier ouvert en double-clic, où le
+    // navigateur interdit `fetch()` sur file://.
+    const viaFichier = location.protocol === 'file:';
+    contenu.innerHTML = `
+      <div class="erreur">
+        <h2>Impossible de lire <code>${echapper(origine)}</code></h2>
+        <p>${echapper(erreur.message)}</p>
+        ${viaFichier ? `
+          <p>Ce fichier a été ouvert directement depuis le disque. Les navigateurs
+          interdisent alors la lecture d'un autre fichier par JavaScript.</p>
+          <pre><code>cd docs
+python -m http.server 8000</code></pre>
+          <p>puis ouvrez <code>http://localhost:8000</code>.</p>` : ''}
+      </div>`;
+    statut.textContent = 'échec de chargement';
+  });
+</script>
+</body>
+</html>

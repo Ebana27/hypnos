@@ -7,6 +7,7 @@ Commande locale :  python manage.py test main
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from hotels.models import Hotel
 from main.models import Notification
 
 User = get_user_model()
@@ -15,8 +16,13 @@ User = get_user_model()
 class NotificationTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        cls.hotel = Hotel.objects.create(
+            name="H", adresse="a", ville="v", tel="t", email="h@h.dev",
+            nombre_etages=1, nombre_chambres=1,
+        )
         cls.user = User.objects.create_user(
-            username="recep", email="recep@hypnos.dev", password="p"
+            username="recep", email="recep@hypnos.dev", password="p",
+            hotel=cls.hotel,
         )
         cls.notif = Notification.objects.create(
             user=cls.user, title="Reservation confirmee",
