@@ -29,10 +29,16 @@
       "icon": "./resources/icon.png",
       "target": [{ "target": "nsis", "arch": ["x64"] }]
     },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "icon": "./resources/icon.png",
+      "identity": null
+    },
     "publish": [
       { "provider": "github", "owner": "Ebana27", "repo": "hypnos-update-history", "releaseType": "release" }
     ]
   },
+
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
