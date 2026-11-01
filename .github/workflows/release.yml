@@ -25,6 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Créer la release si elle n'existe pas
+        # Pas de checkout dans ce job : on ignore le dossier par défaut
         working-directory: .
         shell: bash
         env:
@@ -32,12 +33,15 @@ jobs:
         run: |
           gh release view "$GITHUB_REF_NAME" --repo Ebana27/hypnos-update-history >/dev/null 2>&1 || \
           gh release create "$GITHUB_REF_NAME" --repo Ebana27/hypnos-update-history \
-            --title "$GITHUB_REF_NAME" --notes "Version $GITHUB_REF_NAME"
+            --target main \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Version $GITHUB_REF_NAME"
 
   windows:
     name: Windows (.exe)
-    runs-on: windows-latest
+    # La release est créée par le job « release » ; Windows et macOS tournent en parallèle.
     needs: release
+    runs-on: windows-latest
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
@@ -66,8 +70,7 @@ jobs:
 
   macos:
     name: macOS (.dmg)
-    # Après Windows : les deux jobs ajoutent des fichiers à la MÊME release,
-    # et la créer en même temps risquerait de produire deux releases.
+    # La release est créée par le job « release » ; Windows et macOS tournent en parallèle.
     needs: release
     runs-on: macos-latest
     steps:
@@ -85,6 +88,7 @@ jobs:
         run: npm ci
 
       - name: Aligner la version sur le tag
+        shell: bash
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
 
       - name: Compiler l'application
