@@ -118,6 +118,12 @@ jobs:
       - name: Installer les dépendances
         run: npm ci
 
+      - name: Installer les dépendances Linux pour .deb (fpm)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev rubygems rpm libsecret-1-dev libarchive-tools
+          sudo gem install fpm
+
       - name: Aligner la version sur le tag
         shell: bash
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
@@ -126,6 +132,6 @@ jobs:
         run: npx electron-vite build
 
       - name: Construire et publier l'installateur Linux
-        run: npx electron-builder --linux --publish always
+        run: npx electron-builder --linux AppImage deb --publish always
         env:
           GH_TOKEN: ${{ secrets.HYPNOS_RELEASE }}
