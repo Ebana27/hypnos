@@ -2,15 +2,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import Button from './base/Button'
+import { STATUTS_CHAMBRE } from './base/CardRoom'
 import injecterStyles from './base/injecterStyles'
 import {
-  CANAUX,
   CANAUX_ABREGE,
   DEVISE,
   STATUTS_ACTIFS,
   STATUTS_RESERVATION,
   ajouterJours,
   aujourdhui,
+  chambreReservable,
   cleJour,
   ecartJours,
   enConflit,
@@ -20,20 +21,34 @@ import {
   libelleNuits
 } from '../lib/reservations'
 
-
 const NB_JOURS = 75
 const JOURS_AVANT = 7 // jours affichés avant aujourd'hui
 const LARGEUR_JOUR = 68
 const HAUTEUR_LIGNE = 62
 const LARGEUR_CHAMBRES = 128
 const JOURS_SEMAINE = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam']
-const COULEURS_ETAGE = ['var(--color-accent)', 'var(--color-warning)', 'var(--color-success)']
-const LEGENDE = ['en_attente', 'confirmee', 'en_sejour', 'terminee']
+const LEGENDE = ['paiement_attente', 'confirmee', 'en_sejour', 'terminee']
 
 const borner = (valeur, min, max) => Math.min(max, Math.max(min, valeur))
 
 const formatLong = (date) =>
   date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+const indexDuJour = (debutPeriode, date) => ecartJours(debutPeriode, jourDe(date))
+const indexHoraire = (debutPeriode, texte) => {
+  const s = String(texte ?? '')
+  const jour = indexDuJour(debutPeriode, s)
+  if (s.length <= 10) return jour
+  const h = Number(s.slice(11, 13)) || 0
+  const m = Number(s.slice(14, 16)) || 0
+  return jour + (h * 60 + m) / 1440
+}
+const decalageDate = (texte, jours, heureParDefaut) => {
+  const s = String(texte ?? '')
+  if (s.length <= 10) return `${cleJour(ajouterJours(jourDe(s), jours))}T${heureParDefaut}`
+  const d = new Date(s)
+  d.setDate(d.getDate() + jours)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
 
 // Ce que l'on peut faire d'une barre selon l'état du séjour
 const droitsDe = (statut) => ({
@@ -241,6 +256,7 @@ const STYLES = `
   font-size: 11px;
   color: var(--color-text-muted);
 }
+.tl__chambre .tl__statut { font-size:10px; font-weight:600; color:var(--color-text); }
 
 /* ---------- Piste ---------- */
 .tl__piste {
@@ -383,12 +399,12 @@ const STYLES = `
   font-weight: 700;
 }
 
-/* ---------- Fiche d'une réservation (au survol) ---------- */
+/* ---------- Aperçu au survol : l'essentiel seulement (le détail est dans la fiche, au clic) ---------- */
 .tl__carte {
   position: fixed;
   z-index: 3400;
-  width: 320px;
-  padding: 14px 16px;
+  width: 280px;
+  padding: 12px 14px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-m);
   background: var(--color-surface);
@@ -421,39 +437,22 @@ const STYLES = `
   font-size: 10px;
   font-weight: 600;
 }
-.tl__carte-tel {
-  margin-top: 2px;
+.tl__carte-ligne {
+  margin-top: 6px;
   color: var(--color-text-muted);
 }
-.tl__carte-liste {
-  display: grid;
-  gap: 5px;
+.tl__carte-paiement {
   margin-top: 10px;
-}
-.tl__carte-liste div {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-.tl__carte-liste dt {
-  color: var(--color-text-muted);
-}
-.tl__carte-liste dd {
-  margin: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
   font-weight: 600;
-  text-align: right;
+  color: var(--color-success);
 }
 .tl__carte-du {
   color: var(--color-danger);
 }
-.tl__carte-conso {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-}
 .tl__carte-aide {
-  margin-top: 8px;
+  margin-top: 6px;
   font-size: 11px;
   color: var(--color-text-faint);
 }
@@ -499,11 +498,12 @@ const STYLES = `
 injecterStyles('hypnos-booking-timeline', STYLES)
 
 // ============================================================
-//  FICHE D'UNE RÉSERVATION (affichée au survol)
+//  APERÇU D'UNE RÉSERVATION (affiché au survol) : qui, où, quand, reste à payer
 // ============================================================
 function CarteReservation({ r, position }) {
-  const infos = STATUTS_RESERVATION[r.statut]
+  const infos = STATUTS_RESERVATION[r.statutAffiche]
   const nomComplet = r.client ? `${r.client.prenom} ${r.client.nom}` : r.clientNom
+  const reste = Math.max(r.reste, 0)
   const style = {
     left: position.gauche,
     ...(position.dessous ? { top: position.bord } : { bottom: position.bord })
@@ -517,67 +517,24 @@ function CarteReservation({ r, position }) {
           {infos.libelle}
         </span>
       </div>
-      {r.client?.tel && <p className="tl__carte-tel">{r.client.tel}</p>}
-
-      <dl className="tl__carte-liste">
-        <div>
-          <dt>Chambre</dt>
-          <dd>
-            {r.numeroChambre} · {r.typeLabel}
-          </dd>
-        </div>
-        <div>
-          <dt>Arrivée</dt>
-          <dd>{formatLong(jourDe(r.dateDebut))}</dd>
-        </div>
-        <div>
-          <dt>Départ</dt>
-          <dd>{formatLong(jourDe(r.dateFin))}</dd>
-        </div>
-        <div>
-          <dt>Séjour</dt>
-          <dd>
-            {libelleNuits(r.nuits)} · {r.nombreDePersonne} personne{r.nombreDePersonne > 1 ? 's' : ''}
-          </dd>
-        </div>
-        <div>
-          <dt>Canal</dt>
-          <dd>{CANAUX[r.canal] ?? r.canal}</dd>
-        </div>
-        <div>
-          <dt>Total</dt>
-          <dd>
-            {formatArgent(r.total)} {DEVISE}
-          </dd>
-        </div>
-        <div>
-          <dt>Payé</dt>
-          <dd>
-            {formatArgent(r.montantPaye)} {DEVISE}
-          </dd>
-        </div>
-        <div>
-          <dt>Reste à payer</dt>
-          <dd className={r.reste > 0 ? 'tl__carte-du' : undefined}>
-            {formatArgent(Math.max(r.reste, 0))} {DEVISE}
-          </dd>
-        </div>
-      </dl>
-
-      {r.consos.length > 0 && (
-        <p className="tl__carte-conso">
-          Services : {r.consos.map((c) => `${c.serviceNom} ×${c.quantite}`).join(', ')}
-        </p>
-      )}
-      <p className="tl__carte-aide">Cliquez pour ouvrir la réservation.</p>
+      <p className="tl__carte-ligne">
+        Chambre {r.numeroChambre} · {r.typeLabel}
+      </p>
+      <p className="tl__carte-ligne">
+        {r.typeSejour === 'heure' ? `${formatLong(jourDe(r.dateDebut))} ${String(r.dateDebut).slice(11, 16)} → ${String(r.dateFin).slice(11, 16)} · ${Math.round((new Date(r.dateFin) - new Date(r.dateDebut)) / 60000)} min` : `${formatLong(jourDe(r.dateDebut))} → ${formatLong(jourDe(r.dateFin))} · ${libelleNuits(r.nuits)}`}
+      </p>
+      <p className={`tl__carte-paiement${reste > 0 ? ' tl__carte-du' : ''}`}>
+        {reste > 0 ? `Reste à payer : ${formatArgent(reste)} ${DEVISE}` : 'Séjour soldé'}
+      </p>
+      <p className="tl__carte-aide">Cliquez pour ouvrir la fiche.</p>
     </div>
   )
 }
 
 /**
  * Props :
- *  chambres      [{ id, numero, etage, typeLabel, prixNuit }] déjà triées
- *  reservations  réservations enrichies (clientNom, nuits, total, services, canal…)
+ *  chambres      [{ id, numero, etage, statut, typeLabel, prixNuit }] déjà triées
+ *  reservations  réservations enrichies (clientNom, nuits, total, services, canal, statutAffiche…)
  *  onOuvrir(id)                      clic sur une réservation
  *  onDeplacer(id, { chambreId, debut, fin })  après un glisser valide
  *  onCreer({ chambreId, debut, fin }) clic sur une case libre
@@ -598,7 +555,7 @@ export default function BookingTimeline({
   const refCase = useRef('') // dernière case survolée (évite des calculs inutiles)
   const [apercu, setApercu] = useState(null)
   const [pan, setPan] = useState(false)
-  const [survol, setSurvol] = useState(null) // fiche d'une réservation
+  const [survol, setSurvol] = useState(null) // aperçu d'une réservation
   const [caseSurvol, setCaseSurvol] = useState(null) // case libre sous le curseur
 
   const auj = useMemo(() => aujourdhui(), [])
@@ -610,11 +567,6 @@ export default function BookingTimeline({
 
   const indexLigne = useMemo(() => new Map(chambres.map((c, i) => [c.id, i])), [chambres])
 
-  const couleursEtage = useMemo(() => {
-    const etages = [...new Set(chambres.map((c) => c.etage))].sort((a, b) => a - b)
-    return Object.fromEntries(etages.map((e, i) => [e, COULEURS_ETAGE[i % COULEURS_ETAGE.length]]))
-  }, [chambres])
-
   const visibles = useMemo(
     () =>
       reservations
@@ -622,8 +574,8 @@ export default function BookingTimeline({
         .map((r) => ({
           ...r,
           ligne: indexLigne.get(r.chambreId),
-          idxDebut: ecartJours(debut, jourDe(r.dateDebut)),
-          idxFin: ecartJours(debut, jourDe(r.dateFin))
+          idxDebut: r.typeSejour === 'heure' ? indexHoraire(debut, r.dateDebut) : ecartJours(debut, jourDe(r.dateDebut)),
+          idxFin: r.typeSejour === 'heure' ? indexHoraire(debut, r.dateFin) : ecartJours(debut, jourDe(r.dateFin))
         }))
         .filter((r) => r.idxFin > 0 && r.idxDebut < NB_JOURS),
     [reservations, indexLigne, debut]
@@ -631,9 +583,10 @@ export default function BookingTimeline({
 
   const stats = useMemo(() => {
     const actives = reservations.filter((r) => STATUTS_ACTIFS.includes(r.statut))
-    const cle = cleJour(auj)
+    const now = new Date()
+    const maintenant = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
     const occupees = new Set(
-      actives.filter((r) => r.dateDebut <= cle && cle < r.dateFin).map((r) => r.chambreId)
+      actives.filter((r) => { const d0 = String(r.dateDebut).length === 10 ? `${r.dateDebut}T15:00` : String(r.dateDebut).slice(0, 16); const d1 = String(r.dateFin).length === 10 ? `${r.dateFin}T11:00` : String(r.dateFin).slice(0, 16); return d0 <= maintenant && maintenant < d1 }).map((r) => r.chambreId)
     ).size
     return {
       occupees,
@@ -671,11 +624,11 @@ export default function BookingTimeline({
     fin: cleJour(ajouterJours(debut, jour + 1))
   })
 
-  // Place la fiche sous la barre (ou au-dessus s'il n'y a pas la place)
+  // Place l'aperçu sous la barre (ou au-dessus s'il n'y a pas la place)
   function positionCarte(rect, x) {
-    const dessous = rect.bottom + 290 < window.innerHeight
+    const dessous = rect.bottom + 190 < window.innerHeight
     return {
-      gauche: Math.min(Math.max(8, x - 24), window.innerWidth - 328),
+      gauche: Math.min(Math.max(8, x - 24), window.innerWidth - 288),
       dessous,
       bord: dessous ? rect.bottom + 8 : window.innerHeight - rect.top + 8
     }
@@ -714,7 +667,13 @@ export default function BookingTimeline({
     const cle = cellule ? `${cellule.jour}:${cellule.ligne}` : ''
     if (cle === refCase.current) return
     refCase.current = cle
-    setCaseSurvol(cellule && !enConflit(reservations, candidatPour(cellule)) ? cellule : null)
+    setCaseSurvol(
+      cellule &&
+        !enConflit(reservations, candidatPour(cellule)) &&
+        chambreReservable(chambres[cellule.ligne], candidatPour(cellule).debut)
+        ? cellule
+        : null
+    )
   }
 
   // ---------- Gestes : déplacer, allonger, faire défiler ----------
@@ -796,22 +755,29 @@ export default function BookingTimeline({
     const dl = Math.round((e.clientY - g.y + defil.scrollTop - g.st) / HAUTEUR_LIGNE)
 
     let { idxDebut: d, idxFin: f, ligne } = g.r
+    const dureeMin = g.r.typeSejour === 'heure' ? 1 / 24 : 1
     if (g.mode === 'deplacer') {
       d += dj
       f += dj
       ligne = borner(ligne + dl, 0, chambres.length - 1)
     } else if (g.mode === 'debut') {
-      d = Math.min(d + dj, f - 1)
+      d = Math.min(d + dj, f - dureeMin)
     } else {
-      f = Math.max(f + dj, d + 1)
+      f = Math.max(f + dj, d + dureeMin)
     }
 
     const candidat = {
       chambreId: chambres[ligne].id,
-      debut: cleJour(ajouterJours(debut, d)),
-      fin: cleJour(ajouterJours(debut, f))
+      debut: decalageDate(g.r.dateDebut, g.mode === 'deplacer' || g.mode === 'debut' ? dj : 0, '15:00'),
+      fin: decalageDate(g.r.dateFin, g.mode === 'deplacer' || g.mode === 'fin' ? dj : 0, '11:00')
     }
-    const ok = d >= 0 && f <= NB_JOURS && !enConflit(reservations, candidat, g.r.id)
+    // Une chambre hors service ou en nettoyage n'accepte pas de nouvelle arrivée ;
+    // rester dans sa propre chambre est toujours permis.
+    const ok =
+      d >= 0 &&
+      f <= NB_JOURS &&
+      !enConflit(reservations, candidat, g.r.id) &&
+      (chambres[ligne].id === g.r.chambreId || chambreReservable(chambres[ligne], candidat.debut))
     g.candidat = ok ? candidat : null
     setApercu({ id: g.r.id, idxDebut: d, idxFin: f, ligne, ok, x: e.clientX, y: e.clientY })
   }
@@ -829,7 +795,7 @@ export default function BookingTimeline({
       return
     }
     if (!g.candidat) {
-      onRefus?.('Modification impossible : chambre déjà occupée ou hors de la période affichée.')
+      onRefus?.('Modification impossible : chambre déjà occupée, hors service ou hors de la période affichée.')
       return
     }
     const c = g.candidat
@@ -856,6 +822,10 @@ export default function BookingTimeline({
     const cellule = celluleSous(e)
     if (!cellule) return
     const candidat = candidatPour(cellule)
+    if (!chambreReservable(chambres[cellule.ligne], candidat.debut)) {
+      onRefus?.('Cette chambre est hors service ou en nettoyage.')
+      return
+    }
     if (enConflit(reservations, candidat)) {
       onRefus?.('Cette chambre est déjà réservée ce jour-là.')
       return
@@ -928,7 +898,7 @@ export default function BookingTimeline({
           </span>
         ))}
         <span className="tl__aide">
-          Clic sur une case libre : réserver · Survol : détails · Glisser : déplacer · Bords :
+          Clic sur une case libre : réserver · Survol : aperçu · Glisser : déplacer · Bords :
           allonger
         </span>
       </div>
@@ -969,9 +939,26 @@ export default function BookingTimeline({
 
           <div className="tl__chambres">
             {chambres.map((c) => (
-              <div className="tl__chambre" key={c.id} style={{ '--tl-etage': couleursEtage[c.etage] }}>
+              <div
+                className="tl__chambre"
+                key={c.id}
+                title={STATUTS_CHAMBRE[c.statut]?.libelle}
+                style={{ '--tl-etage': STATUTS_CHAMBRE[c.statut]?.pastille ?? 'var(--color-text-faint)' }}
+                role="button"
+                aria-label={`Chambre ${c.numero}, ${STATUTS_CHAMBRE[c.statut]?.libelle ?? 'statut inconnu'}`}
+                tabIndex={0}
+                onClick={() => {
+                  const maintenant = new Date()
+                  const cleMaintenant = `${maintenant.getFullYear()}-${String(maintenant.getMonth() + 1).padStart(2, '0')}-${String(maintenant.getDate()).padStart(2, '0')}T${String(maintenant.getHours()).padStart(2, '0')}:${String(maintenant.getMinutes()).padStart(2, '0')}`
+                  const occupe = reservations.find((r) => r.chambreId === c.id && STATUTS_ACTIFS.includes(r.statut) && String(r.dateDebut).slice(0, 16) <= cleMaintenant && String(r.dateFin).slice(0, 16) > cleMaintenant)
+                  const prochaine = reservations.find((r) => r.chambreId === c.id && STATUTS_ACTIFS.includes(r.statut) && String(r.dateDebut).slice(0, 10) >= cleJour(auj))
+                  if (occupe || prochaine) onOuvrir((occupe || prochaine).id)
+                }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); const r = reservations.find((x) => x.chambreId === c.id && STATUTS_ACTIFS.includes(x.statut)); if (r) onOuvrir(r.id) } }}
+              >
                 <b>{c.numero}</b>
                 <span>{c.typeLabel}</span>
+                <span className="tl__statut">{STATUTS_CHAMBRE[c.statut]?.libelle ?? 'Statut inconnu'}</span>
               </div>
             ))}
           </div>
@@ -1011,8 +998,8 @@ export default function BookingTimeline({
               const idxFin = ap ? ap.idxFin : r.idxFin
               const ligne = ap ? ap.ligne : r.ligne
               const nuits = idxFin - idxDebut
-              const montant = ap ? nuits * chambres[ligne].prixNuit + r.services : r.total
-              const infos = STATUTS_RESERVATION[r.statut]
+              const montant = ap ? (r.typeSejour === 'heure' ? r.total : nuits * (r.tarifApplique || chambres[ligne].prixNuit) + r.services) : r.total
+              const infos = STATUTS_RESERVATION[r.statutAffiche]
               const droits = droitsDe(r.statut)
               const classes = `tl__resa${ap ? ' tl__resa--deplace' : ''}${ap && !ap.ok ? ' tl__resa--refus' : ''}`
 
@@ -1026,7 +1013,7 @@ export default function BookingTimeline({
                   className={classes}
                   style={{
                     left: idxDebut * LARGEUR_JOUR + 2,
-                    width: nuits * LARGEUR_JOUR - 4,
+                    width: Math.max(r.typeSejour === 'heure' ? 14 : 0, nuits * LARGEUR_JOUR - 4),
                     top: ligne * HAUTEUR_LIGNE,
                     '--resa-fond': infos.fond,
                     '--resa-texte': infos.texte
@@ -1046,7 +1033,7 @@ export default function BookingTimeline({
                   {droits.debut && <span className="tl__poignee tl__poignee--g" data-poignee="g" />}
                   <b>{r.clientNom}</b>
                   <small>
-                    {libelleNuits(nuits)} · {formatArgent(montant)} {DEVISE}
+                    {r.typeSejour === 'heure' ? `${String(r.dateDebut).slice(11, 16)}–${String(r.dateFin).slice(11, 16)}` : libelleNuits(nuits)} · {formatArgent(montant)} {DEVISE}
                   </small>
                   <i className="tl__canal">{CANAUX_ABREGE[r.canal]}</i>
                   {droits.fin && <span className="tl__poignee tl__poignee--d" data-poignee="d" />}
@@ -1075,7 +1062,7 @@ export default function BookingTimeline({
               </b>
             </>
           ) : (
-            'Chambre déjà occupée sur ces dates'
+            'Chambre indisponible sur ces dates'
           )}
         </div>
       )}

@@ -26,7 +26,6 @@ const LIENS = [
   { vers: '/rapports', libelle: 'Rapports', description: 'Statistiques et analyses de performance.', tuto: 'https://www.hypnos.space/tuto/module/#rapports', Icone: TrendingUp }
 ]
 
-const NOM_HOTEL = 'Hôtel Le Céleste'
 const ETAT_SYSTEME = 'Système opérationnel'
 
 const CLE_STOCKAGE = 'hypnos.sidebar.reduite'
@@ -335,7 +334,15 @@ const STYLES = `
 export default function Sidebar() {
   const [reduite, setReduite] = useState(lireEtatInitial)
   const [elementSurvole, setElementSurvole] = useState(null)
+  const [nomHotel, setNomHotel] = useState('')
   const timerRef = useRef(null)
+
+  useEffect(() => {
+    window.electronAPI
+      .sessionCourante()
+      .then((s) => setNomHotel(s?.hotel?.name ?? 'Hypnos'))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     try {
@@ -439,10 +446,10 @@ export default function Sidebar() {
       <div className="sidebar__pied">
         <div className="hotel">
           <span className="hotel__initiale" aria-hidden="true">
-            {NOM_HOTEL.charAt(0)}
+            {nomHotel.charAt(0)}
           </span>
           <div className="hotel__texte">
-            <p className="hotel__nom">{NOM_HOTEL}</p>
+            <p className="hotel__nom">{nomHotel}</p>
             <p className="hotel__etat">
               <span className="hotel__point" />
               {ETAT_SYSTEME}

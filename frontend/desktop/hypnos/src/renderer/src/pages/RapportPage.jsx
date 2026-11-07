@@ -46,6 +46,9 @@ const STYLES = `
 `
 injecterStyles('hypnos-page-rapports', STYLES)
 
+// Entrées de caisse comptées comme recettes (les dons et renforts n'en sont pas)
+const RECETTES = ['acompte', 'paiement_client', 'service']
+
 const cleDate = (date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
 
 export default function RapportPage() {
@@ -58,10 +61,10 @@ export default function RapportPage() {
     let actif = true
     Promise.all([
       window.electronAPI.getAll('reservation'),
-      window.electronAPI.getAll('facture'),
+      window.electronAPI.getAll('mouvementcaisse'),
       window.electronAPI.getAll('chambre')
-    ]).then(([reservations, factures, chambres]) => {
-      if (actif) setDonnees({ reservations, factures, chambres })
+    ]).then(([reservations, mouvements, chambres]) => {
+      if (actif) setDonnees({ reservations, mouvements, chambres })
     }).catch((e) => { if (actif) setErreur(e.message || 'Chargement des rapports impossible.') })
     return () => { actif = false }
   }, [])
@@ -75,9 +78,11 @@ export default function RapportPage() {
     const finExclusive = cleDate(demain)
     const resas = donnees.reservations.filter(r => r.statut !== 'annulee')
     const nbReservations = resas.filter(r => r.dateDebut >= debutCle && r.dateDebut < finExclusive).length
-    const revenu = donnees.factures
-      .filter(f => f.statut !== 'annulee' && String(f.dateEmission).slice(0,10) >= debutCle && String(f.dateEmission).slice(0,10) < finExclusive)
-      .reduce((s,f) => s + Number(f.total || 0), 0)
+
+    const recettes = donnees.mouvements.filter((m) => m.type === 'entree' && RECETTES.includes(m.categorie))
+    const revenu = recettes
+      .filter((m) => m.dateMouvement >= debutCle && m.dateMouvement < finExclusive)
+      .reduce((s, m) => s + m.montant, 0)
 
     // Calcul journalier détaillé pour le graphique
     const detailsParJour = []
@@ -86,10 +91,10 @@ export default function RapportPage() {
       jour.setDate(debut.getDate() + i)
       const cle = cleDate(jour)
       const labelCourt = jour.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })
-      
-      const revJour = donnees.factures
-        .filter(f => f.statut !== 'annulee' && String(f.dateEmission).slice(0,10) === cle)
-        .reduce((s,f) => s + Number(f.total || 0), 0)
+
+      const revJour = recettes
+        .filter((m) => m.dateMouvement === cle)
+        .reduce((s, m) => s + m.montant, 0)
 
       const nuitsJour = resas.filter(r => r.dateDebut <= cle && cle < r.dateFin).length
       const capJour = donnees.chambres.length
@@ -150,9 +155,9 @@ export default function RapportPage() {
           {/* Cartes de KPI principales */}
           <section className="rapports__grille" aria-label="Indicateurs clés">
             <article className="rapports__carte">
-              <p className="rapports__label">Chiffre facturé</p>
+              <p className="rapports__label">Encaissements</p>
               <p className="rapports__valeur">{formatArgent(stats.revenu)} XAF</p>
-              <p className="rapports__note">Factures émises sur la période</p>
+              <p className="rapports__note">Entrées de caisse sur la période</p>
             </article>
             <article className="rapports__carte">
               <p className="rapports__label">Réservations</p>
@@ -172,7 +177,7 @@ export default function RapportPage() {
               <h3 className="rapports__graphe-titre">Évolution quotidienne</h3>
               <div className="rapports__type-graphe" aria-label="Type de métrique graphique">
                 <button type="button" aria-pressed={vueGraphe === 'revenu'} onClick={() => setVueGraphe('revenu')}>
-                  Chiffre d'affaires
+                  Encaissements
                 </button>
                 <button type="button" aria-pressed={vueGraphe === 'occupation'} onClick={() => setVueGraphe('occupation')}>
                   Occupation

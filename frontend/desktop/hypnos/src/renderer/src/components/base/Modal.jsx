@@ -135,6 +135,17 @@ export default function Modal({
   const idTitre = useId()
   const idDescription = useId()
 
+  // CORRECTIF : la page parente crée une nouvelle fonction `onFermer` à chaque frappe.
+  // Avant, l'effet ci-dessous dépendait de `onFermer` : il se relançait donc à chaque lettre tapée
+  // et remettait le focus sur la première chose focalisable, la croix. Désormais on garde la
+  // dernière version dans une référence, et l'effet ne dépend plus que de `ouvert`.
+  const refFermer = useRef(onFermer)
+  const refEchap = useRef(fermerAvecEchap)
+  useEffect(() => {
+    refFermer.current = onFermer
+    refEchap.current = fermerAvecEchap
+  })
+
   useEffect(() => {
     if (!ouvert || typeof document === 'undefined') return undefined
 
@@ -143,13 +154,15 @@ export default function Modal({
     document.body.style.overflow = 'hidden'
 
     const boite = refBoite.current
-    const premier = boite?.querySelector(FOCUSABLE)
+    // Focus initial : le premier champ du contenu ; la croix seulement s'il n'y en a pas
+    const premier =
+      boite?.querySelector(`.modal__corps :is(${FOCUSABLE})`) || boite?.querySelector(FOCUSABLE)
     ;(premier || boite)?.focus()
 
     function gererClavier(event) {
-      if (event.key === 'Escape' && fermerAvecEchap) {
+      if (event.key === 'Escape' && refEchap.current) {
         event.stopPropagation()
-        onFermer?.()
+        refFermer.current?.()
         return
       }
       if (event.key !== 'Tab' || !boite) return
@@ -177,7 +190,7 @@ export default function Modal({
       document.body.style.overflow = overflowPrecedent
       if (actifPrecedent && typeof actifPrecedent.focus === 'function') actifPrecedent.focus()
     }
-  }, [ouvert, onFermer, fermerAvecEchap])
+  }, [ouvert])
 
   if (!ouvert || typeof document === 'undefined') return null
 
