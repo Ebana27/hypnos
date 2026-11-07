@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "945efe72-4c3d-4f82-b0da-4abd4f3aa606",
+  "id": "485b1fdb-9b1a-43b4-b8e0-1ad155e0cda5",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "chambre": {
@@ -49,6 +49,29 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'disponible'"
+        },
+        "statut_depuis": {
+          "name": "statut_depuis",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "climatisation": {
+          "name": "climatisation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "television": {
+          "name": "television",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         }
       },
       "indexes": {
@@ -158,6 +181,30 @@
           "notNull": true,
           "autoincrement": false,
           "default": "''"
+        },
+        "allergies": {
+          "name": "allergies",
+          "type": "text(1000)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "info_generales": {
+          "name": "info_generales",
+          "type": "text(2000)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "vip": {
+          "name": "vip",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "sexe": {
           "name": "sexe",
@@ -718,6 +765,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'11:00:00'"
+        },
+        "marge_nettoyage_minutes": {
+          "name": "marge_nettoyage_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 60
         }
       },
       "indexes": {
@@ -740,6 +795,168 @@
         "hotel_chambres_min": {
           "name": "hotel_chambres_min",
           "value": "\"hotel\".\"nombre_chambres\" >= 0"
+        }
+      }
+    },
+    "mouvement_caisse": {
+      "name": "mouvement_caisse",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "categorie": {
+          "name": "categorie",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "montant": {
+          "name": "montant",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "mode_paiement": {
+          "name": "mode_paiement",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "service_id": {
+          "name": "service_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reservation_id": {
+          "name": "reservation_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "motif": {
+          "name": "motif",
+          "type": "text(255)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "piece_chemin": {
+          "name": "piece_chemin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "date_mouvement": {
+          "name": "date_mouvement",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "mouvement_date_idx": {
+          "name": "mouvement_date_idx",
+          "columns": [
+            "date_mouvement"
+          ],
+          "isUnique": false
+        },
+        "mouvement_reservation_idx": {
+          "name": "mouvement_reservation_idx",
+          "columns": [
+            "reservation_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "mouvement_caisse_service_id_service_id_fk": {
+          "name": "mouvement_caisse_service_id_service_id_fk",
+          "tableFrom": "mouvement_caisse",
+          "tableTo": "service",
+          "columnsFrom": [
+            "service_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "mouvement_caisse_reservation_id_reservation_id_fk": {
+          "name": "mouvement_caisse_reservation_id_reservation_id_fk",
+          "tableFrom": "mouvement_caisse",
+          "tableTo": "reservation",
+          "columnsFrom": [
+            "reservation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "mouvement_caisse_created_by_user_id_fk": {
+          "name": "mouvement_caisse_created_by_user_id_fk",
+          "tableFrom": "mouvement_caisse",
+          "tableTo": "user",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "mouvement_montant_min": {
+          "name": "mouvement_montant_min",
+          "value": "\"mouvement_caisse\".\"montant\" > 0"
         }
       }
     },
@@ -802,12 +1019,93 @@
           "notNull": true,
           "autoincrement": false
         },
-        "nombre_de_personne": {
-          "name": "nombre_de_personne",
+        "type_sejour": {
+          "name": "type_sejour",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'nuit'"
+        },
+        "mode_tarif": {
+          "name": "mode_tarif",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'nuit'"
+        },
+        "regle_arrondi": {
+          "name": "regle_arrondi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'prorata'"
+        },
+        "tarif_applique": {
+          "name": "tarif_applique",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": 0
+        },
+        "nombre_adultes": {
+          "name": "nombre_adultes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "nombre_enfants": {
+          "name": "nombre_enfants",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "type_groupe": {
+          "name": "type_groupe",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'seul'"
+        },
+        "demandes_speciales": {
+          "name": "demandes_speciales",
+          "type": "text(2000)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "conditions_paiement": {
+          "name": "conditions_paiement",
+          "type": "text(500)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "mode_paiement": {
+          "name": "mode_paiement",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'especes'"
+        },
+        "numero_paiement": {
+          "name": "numero_paiement",
+          "type": "text(30)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
         },
         "statut": {
           "name": "statut",
@@ -817,16 +1115,25 @@
           "autoincrement": false,
           "default": "'confirmee'"
         },
-        "created_at": {
-          "name": "created_at",
+        "canal": {
+          "name": "canal",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": "'direct'"
         },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
+        "montant_paye": {
+          "name": "montant_paye",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "nombre_de_personne": {
+          "name": "nombre_de_personne",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -929,6 +1236,14 @@
         "reservation_min_une_personne": {
           "name": "reservation_min_une_personne",
           "value": "\"reservation\".\"nombre_de_personne\" >= 1"
+        },
+        "reservation_adultes_min": {
+          "name": "reservation_adultes_min",
+          "value": "\"reservation\".\"nombre_adultes\" >= 1"
+        },
+        "reservation_enfants_min": {
+          "name": "reservation_enfants_min",
+          "value": "\"reservation\".\"nombre_enfants\" >= 0"
         }
       }
     },
@@ -1023,6 +1338,22 @@
           "notNull": true,
           "autoincrement": false
         },
+        "prix_horaire": {
+          "name": "prix_horaire",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "regle_passage": {
+          "name": "regle_passage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'prorata'"
+        },
         "capacite": {
           "name": "capacite",
           "type": "integer",
@@ -1054,6 +1385,10 @@
         "type_prix_min": {
           "name": "type_prix_min",
           "value": "\"type_de_chambre\".\"prix\" >= 0"
+        },
+        "type_prix_horaire_min": {
+          "name": "type_prix_horaire_min",
+          "value": "\"type_de_chambre\".\"prix_horaire\" >= 0"
         },
         "type_capacite_min": {
           "name": "type_capacite_min",
@@ -1091,6 +1426,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
         },
         "email": {
           "name": "email",

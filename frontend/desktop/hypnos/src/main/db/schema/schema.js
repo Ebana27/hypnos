@@ -30,6 +30,8 @@ export const hotel = sqliteTable(
     nombreChambres: integer('nombre_chambres').notNull(),
     heureArrivee: text('heure_arrivee').notNull().default('15:00:00'),
     heureDepart: text('heure_depart').notNull().default('11:00:00'),
+    // Délai prévu pour nettoyer une chambre après un départ (notifications de nettoyage en retard)
+    margeNettoyageMinutes: integer('marge_nettoyage_minutes').notNull().default(60),
   },
   (t) => [
     check('hotel_etages_min', sql`${t.nombreEtages} >= 1`),
@@ -62,11 +64,14 @@ export const typeDeChambre = sqliteTable(
     id: integer('id').primaryKey({ autoIncrement: true }),
     remoteId: integer('remote_id').unique(),
     label: text('label', { length: 100 }).notNull().unique(),
-    prix: integer('prix').notNull(),
+    prix: integer('prix').notNull(), // tarif par nuit (XAF)
+    prixHoraire: integer('prix_horaire').notNull().default(0),
+    reglePassage: text('regle_passage', { enum: ['prorata', 'heure_commencee'] }).notNull().default('prorata'),
     capacite: integer('capacite').notNull(),
   },
   (t) => [
     check('type_prix_min', sql`${t.prix} >= 0`),
+    check('type_prix_horaire_min', sql`${t.prixHoraire} >= 0`),
     check('type_capacite_min', sql`${t.capacite} >= 1`),
   ],
 );
@@ -81,9 +86,14 @@ export const chambre = sqliteTable(
       .references(() => typeDeChambre.id, { onDelete: 'restrict' }),
     numero: text('numero', { length: 20 }).notNull().unique(),
     etage: integer('etage').notNull(),
-    statut: text('statut', { enum: ['disponible', 'occupee', 'maintenance'] })
+    // « nettoyage » : simple valeur de texte, SQLite n'a pas de contrainte sur l'énumération (aucune migration)
+    statut: text('statut', { enum: ['disponible', 'occupee', 'nettoyage', 'maintenance'] })
       .notNull()
       .default('disponible'),
+    // Date (ISO) du dernier changement de statut : sert au « nettoyage depuis N min »
+    statutDepuis: text('statut_depuis'),
+    climatisation: integer('climatisation', { mode: 'boolean' }).notNull().default(false),
+    television: integer('television', { mode: 'boolean' }).notNull().default(false),
   },
   (t) => [
     index('chambre_statut_idx').on(t.statut),
@@ -106,6 +116,9 @@ export const client = sqliteTable(
     email: text('email', { length: 255 }).notNull(),
     document: text('document', { length: 255 }).notNull().default(''),
     preference: text('preference', { length: 255 }).notNull().default(''),
+    allergies: text('allergies', { length: 1000 }).notNull().default(''),
+    infoGenerales: text('info_generales', { length: 2000 }).notNull().default(''),
+    vip: integer('vip', { mode: 'boolean' }).notNull().default(false),
     sexe: text('sexe', { enum: ['M', 'F'] }).notNull(),
     loyalty: integer('loyalty', { mode: 'boolean' }).notNull().default(false),
     ...timestamps,
@@ -160,6 +173,17 @@ export const reservation = sqliteTable(
       .references(() => user.id, { onDelete: 'restrict' }),
     dateDebut: text('date_debut').notNull(),
     dateFin: text('date_fin').notNull(),
+    typeSejour: text('type_sejour', { enum: ['nuit', 'heure'] }).notNull().default('nuit'),
+    modeTarif: text('mode_tarif', { enum: ['nuit', 'heure'] }).notNull().default('nuit'),
+    regleArrondi: text('regle_arrondi', { enum: ['prorata', 'heure_commencee'] }).notNull().default('prorata'),
+    tarifApplique: integer('tarif_applique').notNull().default(0),
+    nombreAdultes: integer('nombre_adultes').notNull().default(1),
+    nombreEnfants: integer('nombre_enfants').notNull().default(0),
+    typeGroupe: text('type_groupe', { enum: ['seul', 'groupe'] }).notNull().default('seul'),
+    demandesSpeciales: text('demandes_speciales', { length: 2000 }).notNull().default(''),
+    conditionsPaiement: text('conditions_paiement', { length: 500 }).notNull().default(''),
+    modePaiement: text('mode_paiement', { enum: ['especes', 'carte', 'mtn_money', 'airtel_money'] }).notNull().default('especes'),
+    numeroPaiement: text('numero_paiement', { length: 30 }).notNull().default(''),
     statut: text('statut', {
       enum: ['en_attente', 'confirmee', 'en_sejour', 'terminee', 'annulee']
     })
@@ -182,6 +206,8 @@ export const reservation = sqliteTable(
     index('reservation_chambre_dates_idx').on(t.chambreId, t.dateDebut, t.dateFin),
     check('reservation_fin_apres_debut', sql`${t.dateFin} > ${t.dateDebut}`),
     check('reservation_min_une_personne', sql`${t.nombreDePersonne} >= 1`),
+    check('reservation_adultes_min', sql`${t.nombreAdultes} >= 1`),
+    check('reservation_enfants_min', sql`${t.nombreEnfants} >= 0`),
   ],
 );
 
@@ -259,5 +285,41 @@ export const facture = sqliteTable(
   (t) => [
     index('facture_reservation_idx').on(t.reservationId),
     check('facture_total_coherent', sql`${t.total} = ${t.montantHebergement} + ${t.montantServices}`),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+//  Caisse (journal non modifiable : une erreur se corrige par une écriture inverse)
+// ---------------------------------------------------------------------------
+
+export const MODES_PAIEMENT = ['especes', 'carte', 'mtn_money', 'airtel_money'];
+
+export const mouvementCaisse = sqliteTable(
+  'mouvement_caisse',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    type: text('type', { enum: ['entree', 'sortie'] }).notNull(),
+    categorie: text('categorie', {
+      enum: [
+        'acompte', 'paiement_client', 'service', 'don', 'renforcement_patron', 'autre_entree',
+        'achat', 'depense', 'retrait', 'remboursement_acompte', 'autre_sortie',
+      ],
+    }).notNull(),
+    montant: integer('montant').notNull(),
+    modePaiement: text('mode_paiement', { enum: MODES_PAIEMENT }),
+    serviceId: integer('service_id').references(() => service.id, { onDelete: 'set null' }),
+    reservationId: integer('reservation_id').references(() => reservation.id, { onDelete: 'set null' }),
+    motif: text('motif', { length: 255 }).notNull().default(''),
+    pieceChemin: text('piece_chemin'), // saisie du fichier : étape 5b
+    dateMouvement: text('date_mouvement').notNull(),
+    createdBy: integer('created_by')
+      .notNull()
+      .references(() => user.id, { onDelete: 'restrict' }),
+    ...timestamps,
+  },
+  (t) => [
+    index('mouvement_date_idx').on(t.dateMouvement),
+    index('mouvement_reservation_idx').on(t.reservationId),
+    check('mouvement_montant_min', sql`${t.montant} > 0`),
   ],
 );

@@ -5,6 +5,9 @@ CREATE TABLE `chambre` (
 	`numero` text(20) NOT NULL,
 	`etage` integer NOT NULL,
 	`statut` text DEFAULT 'disponible' NOT NULL,
+	`statut_depuis` text,
+	`climatisation` integer DEFAULT false NOT NULL,
+	`television` integer DEFAULT false NOT NULL,
 	FOREIGN KEY (`type_id`) REFERENCES `type_de_chambre`(`id`) ON UPDATE no action ON DELETE restrict,
 	CONSTRAINT "chambre_etage_min" CHECK("chambre"."etage" >= 0)
 );
@@ -21,6 +24,9 @@ CREATE TABLE `client` (
 	`email` text(255) NOT NULL,
 	`document` text(255) DEFAULT '' NOT NULL,
 	`preference` text(255) DEFAULT '' NOT NULL,
+	`allergies` text(1000) DEFAULT '' NOT NULL,
+	`info_generales` text(2000) DEFAULT '' NOT NULL,
+	`vip` integer DEFAULT false NOT NULL,
 	`sexe` text NOT NULL,
 	`loyalty` integer DEFAULT false NOT NULL,
 	`created_at` text NOT NULL,
@@ -99,11 +105,34 @@ CREATE TABLE `hotel` (
 	`nombre_chambres` integer NOT NULL,
 	`heure_arrivee` text DEFAULT '15:00:00' NOT NULL,
 	`heure_depart` text DEFAULT '11:00:00' NOT NULL,
+	`marge_nettoyage_minutes` integer DEFAULT 60 NOT NULL,
 	CONSTRAINT "hotel_etages_min" CHECK("hotel"."nombre_etages" >= 1),
 	CONSTRAINT "hotel_chambres_min" CHECK("hotel"."nombre_chambres" >= 0)
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `hotel_remote_id_unique` ON `hotel` (`remote_id`);--> statement-breakpoint
+CREATE TABLE `mouvement_caisse` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`type` text NOT NULL,
+	`categorie` text NOT NULL,
+	`montant` integer NOT NULL,
+	`mode_paiement` text,
+	`service_id` integer,
+	`reservation_id` integer,
+	`motif` text(255) DEFAULT '' NOT NULL,
+	`piece_chemin` text,
+	`date_mouvement` text NOT NULL,
+	`created_by` integer NOT NULL,
+	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL,
+	FOREIGN KEY (`service_id`) REFERENCES `service`(`id`) ON UPDATE no action ON DELETE set null,
+	FOREIGN KEY (`reservation_id`) REFERENCES `reservation`(`id`) ON UPDATE no action ON DELETE set null,
+	FOREIGN KEY (`created_by`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE restrict,
+	CONSTRAINT "mouvement_montant_min" CHECK("mouvement_caisse"."montant" > 0)
+);
+--> statement-breakpoint
+CREATE INDEX `mouvement_date_idx` ON `mouvement_caisse` (`date_mouvement`);--> statement-breakpoint
+CREATE INDEX `mouvement_reservation_idx` ON `mouvement_caisse` (`reservation_id`);--> statement-breakpoint
 CREATE TABLE `reservation` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`remote_id` integer,
@@ -113,16 +142,29 @@ CREATE TABLE `reservation` (
 	`created_by` integer NOT NULL,
 	`date_debut` text NOT NULL,
 	`date_fin` text NOT NULL,
-	`nombre_de_personne` integer NOT NULL,
+	`type_sejour` text DEFAULT 'nuit' NOT NULL,
+	`mode_tarif` text DEFAULT 'nuit' NOT NULL,
+	`regle_arrondi` text DEFAULT 'prorata' NOT NULL,
+	`tarif_applique` integer DEFAULT 0 NOT NULL,
+	`nombre_adultes` integer DEFAULT 1 NOT NULL,
+	`nombre_enfants` integer DEFAULT 0 NOT NULL,
+	`type_groupe` text DEFAULT 'seul' NOT NULL,
+	`demandes_speciales` text(2000) DEFAULT '' NOT NULL,
+	`conditions_paiement` text(500) DEFAULT '' NOT NULL,
+	`mode_paiement` text DEFAULT 'especes' NOT NULL,
+	`numero_paiement` text(30) DEFAULT '' NOT NULL,
 	`statut` text DEFAULT 'confirmee' NOT NULL,
-	`created_at` text NOT NULL,
-	`updated_at` text NOT NULL,
+	`canal` text DEFAULT 'direct' NOT NULL,
+	`montant_paye` integer DEFAULT 0 NOT NULL,
+	`nombre_de_personne` integer NOT NULL,
 	FOREIGN KEY (`client_id`) REFERENCES `client`(`id`) ON UPDATE no action ON DELETE restrict,
 	FOREIGN KEY (`chambre_id`) REFERENCES `chambre`(`id`) ON UPDATE no action ON DELETE restrict,
 	FOREIGN KEY (`demande_id`) REFERENCES `demande`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`created_by`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE restrict,
 	CONSTRAINT "reservation_fin_apres_debut" CHECK("reservation"."date_fin" > "reservation"."date_debut"),
-	CONSTRAINT "reservation_min_une_personne" CHECK("reservation"."nombre_de_personne" >= 1)
+	CONSTRAINT "reservation_min_une_personne" CHECK("reservation"."nombre_de_personne" >= 1),
+	CONSTRAINT "reservation_adultes_min" CHECK("reservation"."nombre_adultes" >= 1),
+	CONSTRAINT "reservation_enfants_min" CHECK("reservation"."nombre_enfants" >= 0)
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `reservation_remote_id_unique` ON `reservation` (`remote_id`);--> statement-breakpoint
@@ -144,8 +186,11 @@ CREATE TABLE `type_de_chambre` (
 	`remote_id` integer,
 	`label` text(100) NOT NULL,
 	`prix` integer NOT NULL,
+	`prix_horaire` integer DEFAULT 0 NOT NULL,
+	`regle_passage` text DEFAULT 'prorata' NOT NULL,
 	`capacite` integer NOT NULL,
 	CONSTRAINT "type_prix_min" CHECK("type_de_chambre"."prix" >= 0),
+	CONSTRAINT "type_prix_horaire_min" CHECK("type_de_chambre"."prix_horaire" >= 0),
 	CONSTRAINT "type_capacite_min" CHECK("type_de_chambre"."capacite" >= 1)
 );
 --> statement-breakpoint
@@ -156,6 +201,7 @@ CREATE TABLE `user` (
 	`remote_id` integer,
 	`hotel_id` integer NOT NULL,
 	`username` text(150) NOT NULL,
+	`password_hash` text DEFAULT '' NOT NULL,
 	`email` text(255) NOT NULL,
 	`first_name` text(150) DEFAULT '' NOT NULL,
 	`last_name` text(150) DEFAULT '' NOT NULL,
