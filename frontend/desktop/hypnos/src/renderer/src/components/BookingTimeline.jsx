@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import Button from './base/Button'
 import { STATUTS_CHAMBRE } from './base/CardRoom'
@@ -17,17 +17,30 @@ import {
   enConflit,
   formatArgent,
   formatCourt,
+  heuresEntre,
   jourDe,
-  libelleNuits
+  libelleHeures,
+  libelleNuits,
+  montantPassage,
+  versLocal
 } from '../lib/reservations'
 
 const NB_JOURS = 75
 const JOURS_AVANT = 7 // jours affichés avant aujourd'hui
-const LARGEUR_JOUR = 68
 const HAUTEUR_LIGNE = 62
 const LARGEUR_CHAMBRES = 128
+const JOUR_MS = 86_400_000
 const JOURS_SEMAINE = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam']
 const LEGENDE = ['paiement_attente', 'confirmee', 'en_sejour', 'terminee']
+const DUREE_CREATION_PASSAGE_H = 2
+
+// Niveaux de zoom : largeur d'une journée, pas de déplacement d'un passage (en heures),
+// graduation affichée dans l'en-tête (en heures, 0 = aucune) et saut des boutons « ‹ ›».
+const ZOOMS = {
+  jour: { libelle: 'Jours', largeur: 68, pasHeures: 24, graduation: 0, navJours: 7 },
+  demi: { libelle: '6 h', largeur: 288, pasHeures: 1, graduation: 6, navJours: 3 },
+  heures: { libelle: 'Heures', largeur: 960, pasHeures: 0.5, graduation: 1, navJours: 1 }
+}
 
 const borner = (valeur, min, max) => Math.min(max, Math.max(min, valeur))
 
@@ -42,12 +55,19 @@ const indexHoraire = (debutPeriode, texte) => {
   const m = Number(s.slice(14, 16)) || 0
   return jour + (h * 60 + m) / 1440
 }
-const decalageDate = (texte, jours, heureParDefaut) => {
+// Décale une date de n jours (séjours en nuitées) en gardant l'heure d'origine
+const decalerJours = (texte, jours, heureParDefaut) => {
   const s = String(texte ?? '')
   if (s.length <= 10) return `${cleJour(ajouterJours(jourDe(s), jours))}T${heureParDefaut}`
   const d = new Date(s)
   d.setDate(d.getDate() + jours)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  return versLocal(d)
+}
+// Décale une date de n minutes (passages)
+const decalerMinutes = (texte, minutes) => {
+  const d = new Date(String(texte).length <= 10 ? `${texte}T15:00` : texte)
+  d.setMinutes(d.getMinutes() + minutes)
+  return versLocal(d)
 }
 
 // Ce que l'on peut faire d'une barre selon l'état du séjour
@@ -69,7 +89,7 @@ const STYLES = `
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
+  gap: 12px 16px;
 }
 .tl__stats {
   display: flex;
@@ -108,7 +128,33 @@ const STYLES = `
 .tl__stat b small { color: var(--color-text-muted); font: 500 11px 'Inter', sans-serif; }
 .tl__nav {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+}
+.tl__zoom {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+}
+.tl__zoom button {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.tl__zoom button:hover { color: var(--color-accent); }
+.tl__zoom button[aria-pressed='true'] {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
 }
 .tl__legende {
   display: flex;
@@ -199,6 +245,7 @@ const STYLES = `
   font-weight: 600;
   color: var(--color-text);
 }
+.tl__jour-label { display: block; }
 .tl__jour--we {
   background: var(--color-background-soft);
 }
@@ -209,10 +256,39 @@ const STYLES = `
 .tl__jour--auj b {
   color: var(--color-accent-contrast);
 }
+/* Zoom : le jour reste lisible en défilant (le libellé suit la fenêtre) */
+.tl--zoom .tl__jour { text-align: left; }
+.tl--zoom .tl__jour-label {
+  position: sticky;
+  left: calc(var(--tl-cw) + 10px);
+  display: inline-block;
+  padding-left: 10px;
+}
+.tl--zoom .tl__jour-label b { display: inline; margin-left: 6px; font-size: 15px; }
+.tl__heures {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  height: 16px;
+  border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+}
+.tl__heures i {
+  flex: none;
+  box-sizing: border-box;
+  padding: 2px 0 0 3px;
+  border-left: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  font-size: 9px;
+  font-style: normal;
+  line-height: 12px;
+  opacity: 0.8;
+}
 .tl__mois {
   position: absolute;
   top: 2px;
   left: 4px;
+  z-index: 1;
   padding: 1px 6px;
   border-radius: 5px;
   background: var(--color-text);
@@ -265,9 +341,10 @@ const STYLES = `
   overflow: hidden;
   background-image:
     linear-gradient(var(--color-border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--color-border) 1px, transparent 1px);
-  background-size: var(--tl-dw) var(--tl-rh);
-  background-position: 0 -1px, 0 0;
+    linear-gradient(90deg, var(--color-border) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-border) 55%, transparent) 1px, transparent 1px);
+  background-size: var(--tl-dw) var(--tl-rh), var(--tl-dw) var(--tl-rh), var(--tl-sub) var(--tl-rh);
+  background-position: 0 -1px, 0 0, 0 0;
 }
 .tl__col {
   position: absolute;
@@ -283,13 +360,33 @@ const STYLES = `
   box-shadow: inset 2px 0 0 var(--color-accent);
   opacity: 1;
 }
+/* Ligne « maintenant » : repère des séjours courts */
+.tl__maintenant {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 3;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--color-danger);
+  pointer-events: none;
+}
+.tl__maintenant::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-danger);
+}
 
 /* Case libre sous le curseur : un clic crée une réservation */
 .tl__case {
   position: absolute;
   display: grid;
   place-items: center;
-  width: var(--tl-dw);
   height: var(--tl-rh);
   border: 1px dashed var(--color-accent);
   border-radius: 8px;
@@ -345,6 +442,13 @@ const STYLES = `
   opacity: 0.88;
   text-overflow: ellipsis;
 }
+/* Barres courtes : on garde l'essentiel, le détail est dans l'aperçu au survol */
+.tl__resa--etroit { padding: 5px 9px; border-radius: 9px; }
+.tl__resa--etroit .tl__canal { display: none; }
+.tl__resa--court small { display: none; }
+.tl__resa--minuscule { padding: 0; border-radius: 7px; }
+.tl__resa--minuscule b,
+.tl__resa--minuscule small { display: none; }
 .tl__canal {
   position: absolute;
   top: 5px;
@@ -365,6 +469,7 @@ const STYLES = `
   width: 14px;
   cursor: ew-resize;
 }
+.tl__resa--etroit .tl__poignee { width: 8px; }
 .tl__poignee--g { left: 0; }
 .tl__poignee--d { right: 0; }
 .tl__poignee::after {
@@ -378,6 +483,7 @@ const STYLES = `
   background: currentColor;
   opacity: 0;
 }
+.tl__resa--etroit .tl__poignee::after { left: 2px; }
 .tl__resa:hover .tl__poignee::after,
 .tl__resa--deplace .tl__poignee::after {
   opacity: 0.7;
@@ -521,7 +627,9 @@ function CarteReservation({ r, position }) {
         Chambre {r.numeroChambre} · {r.typeLabel}
       </p>
       <p className="tl__carte-ligne">
-        {r.typeSejour === 'heure' ? `${formatLong(jourDe(r.dateDebut))} ${String(r.dateDebut).slice(11, 16)} → ${String(r.dateFin).slice(11, 16)} · ${Math.round((new Date(r.dateFin) - new Date(r.dateDebut)) / 60000)} min` : `${formatLong(jourDe(r.dateDebut))} → ${formatLong(jourDe(r.dateFin))} · ${libelleNuits(r.nuits)}`}
+        {r.typeSejour === 'heure'
+          ? `${formatLong(jourDe(r.dateDebut))} ${String(r.dateDebut).slice(11, 16)} → ${String(r.dateFin).slice(11, 16)} · ${libelleHeures(heuresEntre(r.dateDebut, r.dateFin))}`
+          : `${formatLong(jourDe(r.dateDebut))} → ${formatLong(jourDe(r.dateFin))} · ${libelleNuits(r.nuits)}`}
       </p>
       <p className={`tl__carte-paiement${reste > 0 ? ' tl__carte-du' : ''}`}>
         {reste > 0 ? `Reste à payer : ${formatArgent(reste)} ${DEVISE}` : 'Séjour soldé'}
@@ -537,7 +645,7 @@ function CarteReservation({ r, position }) {
  *  reservations  réservations enrichies (clientNom, nuits, total, services, canal, statutAffiche…)
  *  onOuvrir(id)                      clic sur une réservation
  *  onDeplacer(id, { chambreId, debut, fin })  après un glisser valide
- *  onCreer({ chambreId, debut, fin }) clic sur une case libre
+ *  onCreer({ chambreId, debut, fin, typeSejour }) clic sur une case libre
  *  onRefus(message)                  glisser impossible
  */
 export default function BookingTimeline({
@@ -553,10 +661,17 @@ export default function BookingTimeline({
   const refGeste = useRef(null)
   const refGesteBouge = useRef(false) // un glisser vient d'avoir lieu : le clic qui suit est ignoré
   const refCase = useRef('') // dernière case survolée (évite des calculs inutiles)
+  const refCentre = useRef(null) // jour au centre de l'écran, conservé pendant un changement de zoom
+  const [zoom, setZoom] = useState('jour')
   const [apercu, setApercu] = useState(null)
   const [pan, setPan] = useState(false)
   const [survol, setSurvol] = useState(null) // aperçu d'une réservation
   const [caseSurvol, setCaseSurvol] = useState(null) // case libre sous le curseur
+  const [maintenant, setMaintenant] = useState(() => new Date())
+
+  const infosZoom = ZOOMS[zoom]
+  const lj = infosZoom.largeur // largeur d'une journée, en pixels
+  const zoome = zoom !== 'jour'
 
   const auj = useMemo(() => aujourdhui(), [])
   const debut = useMemo(() => ajouterJours(auj, -JOURS_AVANT), [auj])
@@ -583,10 +698,9 @@ export default function BookingTimeline({
 
   const stats = useMemo(() => {
     const actives = reservations.filter((r) => STATUTS_ACTIFS.includes(r.statut))
-    const now = new Date()
-    const maintenant = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    const maintenantIso = versLocal(new Date())
     const occupees = new Set(
-      actives.filter((r) => { const d0 = String(r.dateDebut).length === 10 ? `${r.dateDebut}T15:00` : String(r.dateDebut).slice(0, 16); const d1 = String(r.dateFin).length === 10 ? `${r.dateFin}T11:00` : String(r.dateFin).slice(0, 16); return d0 <= maintenant && maintenant < d1 }).map((r) => r.chambreId)
+      actives.filter((r) => { const d0 = String(r.dateDebut).length === 10 ? `${r.dateDebut}T15:00` : String(r.dateDebut).slice(0, 16); const d1 = String(r.dateFin).length === 10 ? `${r.dateFin}T11:00` : String(r.dateFin).slice(0, 16); return d0 <= maintenantIso && maintenantIso < d1 }).map((r) => r.chambreId)
     ).size
     return {
       occupees,
@@ -595,34 +709,75 @@ export default function BookingTimeline({
     }
   }, [reservations, auj])
 
+  // La ligne « maintenant » avance toute seule
+  useEffect(() => {
+    const minuteur = window.setInterval(() => setMaintenant(new Date()), 60_000)
+    return () => window.clearInterval(minuteur)
+  }, [])
+  const idxMaintenant = (maintenant.getTime() - debut.getTime()) / JOUR_MS
+
   // Au démarrage : la veille d'aujourd'hui est la première colonne visible
   useEffect(() => {
-    if (refDefil.current) refDefil.current.scrollLeft = (JOURS_AVANT - 1) * LARGEUR_JOUR
+    if (refDefil.current) refDefil.current.scrollLeft = (JOURS_AVANT - 1) * ZOOMS.jour.largeur
   }, [])
 
+  // Après un changement de zoom : on retrouve le même moment au centre de l'écran
+  useLayoutEffect(() => {
+    const defil = refDefil.current
+    if (refCentre.current == null || !defil) return
+    defil.scrollLeft = Math.max(0, refCentre.current * lj - (defil.clientWidth - LARGEUR_CHAMBRES) / 2)
+    refCentre.current = null
+  }, [lj])
+
+  function changerZoom(niveau) {
+    if (niveau === zoom) return
+    const defil = refDefil.current
+    if (defil) refCentre.current = (defil.scrollLeft + (defil.clientWidth - LARGEUR_CHAMBRES) / 2) / lj
+    masquerSurvols()
+    setZoom(niveau)
+  }
+
   const defiler = (nombreJours) =>
-    refDefil.current?.scrollBy({ left: nombreJours * LARGEUR_JOUR, behavior: 'smooth' })
-  const versAujourdhui = () =>
-    refDefil.current?.scrollTo({ left: (JOURS_AVANT - 1) * LARGEUR_JOUR, behavior: 'smooth' })
+    refDefil.current?.scrollBy({ left: nombreJours * lj, behavior: 'smooth' })
+  const versAujourdhui = () => {
+    const fraction = (maintenant.getHours() * 60 + maintenant.getMinutes()) / 1440
+    const cible = zoome ? (JOURS_AVANT + fraction) * lj - 180 : (JOURS_AVANT - 1) * lj
+    refDefil.current?.scrollTo({ left: Math.max(0, cible), behavior: 'smooth' })
+  }
 
   // ---------- Cases et survol ----------
-  // Case (jour, chambre) sous le curseur, ou null si le curseur est hors de la piste
+  // Case (jour, chambre, heure) sous le curseur, ou null si le curseur est hors de la piste
   function celluleSous(e) {
     const piste = refPiste.current
     if (!piste) return null
     const rect = piste.getBoundingClientRect()
-    const jour = Math.floor((e.clientX - rect.left) / LARGEUR_JOUR)
+    const x = (e.clientX - rect.left) / lj
+    const jour = Math.floor(x)
     const ligne = Math.floor((e.clientY - rect.top) / HAUTEUR_LIGNE)
     if (jour < 0 || jour >= NB_JOURS || ligne < 0 || ligne >= chambres.length) return null
-    return { jour, ligne }
+    return { jour, ligne, heure: Math.floor((x - jour) * 24) }
   }
 
-  // Réservation d'une nuit qui commencerait sur cette case
-  const candidatPour = ({ jour, ligne }) => ({
-    chambreId: chambres[ligne].id,
-    debut: cleJour(ajouterJours(debut, jour)),
-    fin: cleJour(ajouterJours(debut, jour + 1))
-  })
+  // Dézoomé : une nuit sur la case. Zoomé : un passage de 2 h à l'heure survolée.
+  const candidatPour = ({ jour, ligne, heure }) => {
+    if (!zoome) {
+      return {
+        chambreId: chambres[ligne].id,
+        debut: cleJour(ajouterJours(debut, jour)),
+        fin: cleJour(ajouterJours(debut, jour + 1)),
+        typeSejour: 'nuit'
+      }
+    }
+    const arrivee = ajouterJours(debut, jour)
+    arrivee.setHours(heure, 0, 0, 0)
+    const depart = new Date(arrivee.getTime() + DUREE_CREATION_PASSAGE_H * 3600000)
+    return {
+      chambreId: chambres[ligne].id,
+      debut: versLocal(arrivee),
+      fin: versLocal(depart),
+      typeSejour: 'heure'
+    }
+  }
 
   // Place l'aperçu sous la barre (ou au-dessus s'il n'y a pas la place)
   function positionCarte(rect, x) {
@@ -664,7 +819,7 @@ export default function BookingTimeline({
     }
 
     const cellule = celluleSous(e)
-    const cle = cellule ? `${cellule.jour}:${cellule.ligne}` : ''
+    const cle = cellule ? `${cellule.jour}:${cellule.ligne}:${zoome ? cellule.heure : 0}` : ''
     if (cle === refCase.current) return
     refCase.current = cle
     setCaseSurvol(
@@ -751,11 +906,15 @@ export default function BookingTimeline({
     if (e.clientX > rect.right - 70) defil.scrollLeft += 14
     else if (e.clientX < rect.left + LARGEUR_CHAMBRES + 60) defil.scrollLeft -= 14
 
-    const dj = Math.round((e.clientX - g.x + defil.scrollLeft - g.sl) / LARGEUR_JOUR)
+    // Une nuitée se déplace par jours entiers ; un passage par pas d'une demi-heure ou d'une heure selon le zoom
+    const passage = g.r.typeSejour === 'heure'
+    const pasJours = passage ? infosZoom.pasHeures / 24 : 1
+    const brut = (e.clientX - g.x + defil.scrollLeft - g.sl) / lj
+    const dj = Math.round(brut / pasJours) * pasJours
     const dl = Math.round((e.clientY - g.y + defil.scrollTop - g.st) / HAUTEUR_LIGNE)
 
     let { idxDebut: d, idxFin: f, ligne } = g.r
-    const dureeMin = g.r.typeSejour === 'heure' ? 1 / 24 : 1
+    const dureeMin = passage ? 1 / 24 : 1
     if (g.mode === 'deplacer') {
       d += dj
       f += dj
@@ -766,16 +925,20 @@ export default function BookingTimeline({
       f = Math.max(f + dj, d + dureeMin)
     }
 
+    // Les dates candidates sont calculées depuis les bornes finales (d, f) : jamais de départ avant l'arrivée
+    const dd = d - g.r.idxDebut
+    const df = f - g.r.idxFin
     const candidat = {
       chambreId: chambres[ligne].id,
-      debut: decalageDate(g.r.dateDebut, g.mode === 'deplacer' || g.mode === 'debut' ? dj : 0, '15:00'),
-      fin: decalageDate(g.r.dateFin, g.mode === 'deplacer' || g.mode === 'fin' ? dj : 0, '11:00')
+      debut: passage ? decalerMinutes(g.r.dateDebut, Math.round(dd * 1440)) : decalerJours(g.r.dateDebut, Math.round(dd), '15:00'),
+      fin: passage ? decalerMinutes(g.r.dateFin, Math.round(df * 1440)) : decalerJours(g.r.dateFin, Math.round(df), '11:00')
     }
     // Une chambre hors service ou en nettoyage n'accepte pas de nouvelle arrivée ;
     // rester dans sa propre chambre est toujours permis.
     const ok =
       d >= 0 &&
       f <= NB_JOURS &&
+      candidat.fin > candidat.debut &&
       !enConflit(reservations, candidat, g.r.id) &&
       (chambres[ligne].id === g.r.chambreId || chambreReservable(chambres[ligne], candidat.debut))
     g.candidat = ok ? candidat : null
@@ -827,7 +990,7 @@ export default function BookingTimeline({
       return
     }
     if (enConflit(reservations, candidat)) {
-      onRefus?.('Cette chambre est déjà réservée ce jour-là.')
+      onRefus?.(zoome ? 'Cette chambre est déjà réservée sur ce créneau.' : 'Cette chambre est déjà réservée ce jour-là.')
       return
     }
     masquerSurvols()
@@ -846,11 +1009,22 @@ export default function BookingTimeline({
   const enCours = apercu ? visibles.find((v) => v.id === apercu.id) : null
   const resaSurvol = survol && !apercu ? visibles.find((v) => v.id === survol.id) : null
 
+  const dateIdx = (idx) => new Date(debut.getTime() + idx * JOUR_MS)
+  const heureIdx = (idx) => dateIdx(idx).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  const montantApercu = (r, idxD, idxF, ligne) =>
+    r.typeSejour === 'heure'
+      ? montantPassage((idxF - idxD) * 24, r.regleArrondi, r.tarifApplique, chambres[ligne].prixNuit).montant + r.services
+      : Math.round(idxF - idxD) * (r.tarifApplique || chambres[ligne].prixNuit) + r.services
+
+  const graduation = infosZoom.graduation
+  const largeurCaseSurvol = zoome ? (lj * DUREE_CREATION_PASSAGE_H) / 24 : lj
+
   return (
     <div
-      className="tl"
+      className={`tl${zoome ? ' tl--zoom' : ''}`}
       style={{
-        '--tl-dw': `${LARGEUR_JOUR}px`,
+        '--tl-dw': `${lj}px`,
+        '--tl-sub': `${zoome ? (lj * graduation) / 24 : lj}px`,
         '--tl-rh': `${HAUTEUR_LIGNE}px`,
         '--tl-cw': `${LARGEUR_CHAMBRES}px`,
         '--tl-n': NB_JOURS
@@ -873,19 +1047,26 @@ export default function BookingTimeline({
         </div>
 
         <div className="tl__nav">
-          <Button variante="secondaire" taille="s" icone={ChevronLeft} onClick={() => defiler(-7)}>
-            7 j
+          <div className="tl__zoom" role="group" aria-label="Échelle du planning">
+            {Object.entries(ZOOMS).map(([id, z]) => (
+              <button key={id} type="button" aria-pressed={zoom === id} title={id === 'jour' ? 'Vue par jours' : id === 'demi' ? 'Zoom : graduation toutes les 6 heures' : 'Zoom maximal : graduation à l’heure, idéal pour les passages'} onClick={() => changerZoom(id)}>
+                {z.libelle}
+              </button>
+            ))}
+          </div>
+          <Button variante="secondaire" taille="s" icone={ChevronLeft} onClick={() => defiler(-infosZoom.navJours)}>
+            {infosZoom.navJours} j
           </Button>
           <Button variante="secondaire" taille="s" onClick={versAujourdhui}>
-            Aujourd’hui
+            {zoome ? 'Maintenant' : 'Aujourd’hui'}
           </Button>
           <Button
             variante="secondaire"
             taille="s"
             iconeDroite={ChevronRight}
-            onClick={() => defiler(7)}
+            onClick={() => defiler(infosZoom.navJours)}
           >
-            7 j
+            {infosZoom.navJours} j
           </Button>
         </div>
       </div>
@@ -898,8 +1079,9 @@ export default function BookingTimeline({
           </span>
         ))}
         <span className="tl__aide">
-          Clic sur une case libre : réserver · Survol : aperçu · Glisser : déplacer · Bords :
-          allonger
+          {zoome
+            ? 'Clic sur une case libre : passage de 2 h · Glisser : déplacer · Bords : allonger'
+            : 'Clic sur une case libre : réserver · Séjours courts : zoom 6 h / Heures · Glisser : déplacer'}
         </span>
       </div>
 
@@ -930,8 +1112,17 @@ export default function BookingTimeline({
                       {jour.toLocaleDateString('fr-FR', { month: 'short' })}
                     </em>
                   )}
-                  {JOURS_SEMAINE[jour.getDay()]}
-                  <b>{jour.getDate()}</b>
+                  <span className="tl__jour-label">
+                    {JOURS_SEMAINE[jour.getDay()]}
+                    <b>{jour.getDate()}</b>
+                  </span>
+                  {graduation > 0 && (
+                    <span className="tl__heures" aria-hidden="true">
+                      {Array.from({ length: 24 / graduation }, (_, k) => (
+                        <i key={k} style={{ width: (lj * graduation) / 24 }}>{String(k * graduation).padStart(2, '0')}h</i>
+                      ))}
+                    </span>
+                  )}
                 </div>
               )
             })}
@@ -948,8 +1139,7 @@ export default function BookingTimeline({
                 aria-label={`Chambre ${c.numero}, ${STATUTS_CHAMBRE[c.statut]?.libelle ?? 'statut inconnu'}`}
                 tabIndex={0}
                 onClick={() => {
-                  const maintenant = new Date()
-                  const cleMaintenant = `${maintenant.getFullYear()}-${String(maintenant.getMonth() + 1).padStart(2, '0')}-${String(maintenant.getDate()).padStart(2, '0')}T${String(maintenant.getHours()).padStart(2, '0')}:${String(maintenant.getMinutes()).padStart(2, '0')}`
+                  const cleMaintenant = versLocal(new Date())
                   const occupe = reservations.find((r) => r.chambreId === c.id && STATUTS_ACTIFS.includes(r.statut) && String(r.dateDebut).slice(0, 16) <= cleMaintenant && String(r.dateFin).slice(0, 16) > cleMaintenant)
                   const prochaine = reservations.find((r) => r.chambreId === c.id && STATUTS_ACTIFS.includes(r.statut) && String(r.dateDebut).slice(0, 10) >= cleJour(auj))
                   if (occupe || prochaine) onOuvrir((occupe || prochaine).id)
@@ -977,16 +1167,24 @@ export default function BookingTimeline({
                 <div
                   className={`tl__col${estAuj ? ' tl__col--auj' : ''}`}
                   key={i}
-                  style={{ left: i * LARGEUR_JOUR }}
+                  style={{ left: i * lj }}
                 />
               )
             })}
+
+            {idxMaintenant > 0 && idxMaintenant < NB_JOURS && (
+              <div className="tl__maintenant" aria-hidden="true" style={{ left: idxMaintenant * lj }} />
+            )}
 
             {caseSurvol && (
               <div
                 className="tl__case"
                 aria-hidden="true"
-                style={{ left: caseSurvol.jour * LARGEUR_JOUR, top: caseSurvol.ligne * HAUTEUR_LIGNE }}
+                style={{
+                  left: zoome ? (caseSurvol.jour + caseSurvol.heure / 24) * lj : caseSurvol.jour * lj,
+                  top: caseSurvol.ligne * HAUTEUR_LIGNE,
+                  width: largeurCaseSurvol
+                }}
               >
                 <Plus size={16} />
               </div>
@@ -997,11 +1195,19 @@ export default function BookingTimeline({
               const idxDebut = ap ? ap.idxDebut : r.idxDebut
               const idxFin = ap ? ap.idxFin : r.idxFin
               const ligne = ap ? ap.ligne : r.ligne
-              const nuits = idxFin - idxDebut
-              const montant = ap ? (r.typeSejour === 'heure' ? r.total : nuits * (r.tarifApplique || chambres[ligne].prixNuit) + r.services) : r.total
+              const passage = r.typeSejour === 'heure'
+              const largeur = Math.max(passage ? 18 : 0, (idxFin - idxDebut) * lj - 4)
+              const montant = ap ? montantApercu(r, idxDebut, idxFin, ligne) : r.total
               const infos = STATUTS_RESERVATION[r.statutAffiche]
               const droits = droitsDe(r.statut)
-              const classes = `tl__resa${ap ? ' tl__resa--deplace' : ''}${ap && !ap.ok ? ' tl__resa--refus' : ''}`
+              const classes = [
+                'tl__resa',
+                ap && 'tl__resa--deplace',
+                ap && !ap.ok && 'tl__resa--refus',
+                largeur < 120 && 'tl__resa--etroit',
+                largeur < 150 && 'tl__resa--court',
+                largeur < 44 && 'tl__resa--minuscule'
+              ].filter(Boolean).join(' ')
 
               return (
                 <div
@@ -1012,8 +1218,8 @@ export default function BookingTimeline({
                   aria-label={`${r.clientNom}, chambre ${r.numeroChambre}, ${infos.libelle}`}
                   className={classes}
                   style={{
-                    left: idxDebut * LARGEUR_JOUR + 2,
-                    width: Math.max(r.typeSejour === 'heure' ? 14 : 0, nuits * LARGEUR_JOUR - 4),
+                    left: idxDebut * lj + 2,
+                    width: largeur,
                     top: ligne * HAUTEUR_LIGNE,
                     '--resa-fond': infos.fond,
                     '--resa-texte': infos.texte
@@ -1033,7 +1239,7 @@ export default function BookingTimeline({
                   {droits.debut && <span className="tl__poignee tl__poignee--g" data-poignee="g" />}
                   <b>{r.clientNom}</b>
                   <small>
-                    {r.typeSejour === 'heure' ? `${String(r.dateDebut).slice(11, 16)}–${String(r.dateFin).slice(11, 16)}` : libelleNuits(nuits)} · {formatArgent(montant)} {DEVISE}
+                    {passage ? `${String(r.dateDebut).slice(11, 16)}–${String(r.dateFin).slice(11, 16)}` : libelleNuits(Math.round(idxFin - idxDebut))} · {formatArgent(montant)} {DEVISE}
                   </small>
                   <i className="tl__canal">{CANAUX_ABREGE[r.canal]}</i>
                   {droits.fin && <span className="tl__poignee tl__poignee--d" data-poignee="d" />}
@@ -1049,16 +1255,12 @@ export default function BookingTimeline({
           {apercu.ok ? (
             <>
               Chambre <b>{chambres[apercu.ligne].numero}</b> ·{' '}
-              {formatCourt(ajouterJours(debut, apercu.idxDebut))} →{' '}
-              {formatCourt(ajouterJours(debut, apercu.idxFin))} ·{' '}
-              {libelleNuits(apercu.idxFin - apercu.idxDebut)}
+              {enCours.typeSejour === 'heure'
+                ? `${formatCourt(dateIdx(apercu.idxDebut))} ${heureIdx(apercu.idxDebut)} → ${heureIdx(apercu.idxFin)} · ${libelleHeures((apercu.idxFin - apercu.idxDebut) * 24)}`
+                : `${formatCourt(dateIdx(apercu.idxDebut))} → ${formatCourt(dateIdx(apercu.idxFin))} · ${libelleNuits(Math.round(apercu.idxFin - apercu.idxDebut))}`}
               <br />
               <b>
-                {formatArgent(
-                  (apercu.idxFin - apercu.idxDebut) * chambres[apercu.ligne].prixNuit +
-                    enCours.services
-                )}{' '}
-                {DEVISE}
+                {formatArgent(montantApercu(enCours, apercu.idxDebut, apercu.idxFin, apercu.ligne))} {DEVISE}
               </b>
             </>
           ) : (
