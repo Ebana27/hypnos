@@ -16,7 +16,7 @@ import {
 import BookingTimeline from '../components/BookingTimeline'
 import MethodesPaiement from '../components/MethodesPaiement'
 import logotype from '../assets/images/logotype.png'
-import { enregistrerFacture, genererFacturePdf } from '../lib/facturePdf'
+import { enregistrerFacture, genererFacturePdf } from '../lib/facturepdf'
 import Button from '../components/base/Button'
 import FailToast from '../components/base/FailToast'
 import FilterPillule from '../components/base/FilterPillule'
