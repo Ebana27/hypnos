@@ -1,12 +1,13 @@
 /* eslint-disable react/prop-types */
-import { useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { Minus, Plus } from 'lucide-react'
 import Button from './base/Button'
 import Input from './base/Input'
-import PanneauMarque, { BarreFenetre } from './base/PanneauMarque'
+import { BarreFenetre } from './base/PanneauMarque'
 import ProgressBar from './base/ProgressBar'
 import injecterStyles from './base/injecterStyles'
 import { DEVISE, formatArgent } from '../lib/reservations'
+import logotypeWhite from '../assets/images/logotype_white.png'
 
 const ETAPES = [
   { titre: 'Votre établissement', aide: 'Comment s’appelle votre hôtel, et où se trouve-t-il ?' },
@@ -16,6 +17,8 @@ const ETAPES = [
   { titre: 'Vérification', aide: 'Relisez avant de créer votre hôtel.' }
 ]
 const DERNIERE = ETAPES.length - 1
+const ETAPE_BATIMENT = 1 // le bâtiment n'apparaît à gauche que sur cette étape
+const FORME_PAR_ETAPE = [0, 1, 2, 0, 1] // quelle forme du fond est en place à chaque étape
 const ETAGES_MAX = 30 // au-dessus du rez-de-chaussée
 const CHAMBRES_MAX = 60 // par étage
 
@@ -42,140 +45,408 @@ const pluriel = (n, singulier, plur = `${singulier}s`) => `${n} ${n > 1 ? plur :
 // Les chambres sont numérotées de 1 à N sans interruption, en partant du niveau le plus bas.
 const totalChambres = (f) => f.chambresRez + f.etagesHauts * f.chambresParEtage
 
+const clamp = (x, min, max) => Math.min(max, Math.max(min, x))
+const mouvementReduit = () =>
+  typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
+
 // ============================================================
-//  APERÇU DU BÂTIMENT (SVG, mis à l'échelle automatiquement)
+//  TEXTE ANIMÉ LETTRE PAR LETTRE
+//  Les mots restent insécables : le retour à la ligne ne coupe jamais un mot.
+//  Le rythme se règle avec --debut et --pas sur le parent.
 // ============================================================
-const CW = 26 // largeur d'une chambre
-const FH = 34 // hauteur d'un étage
-const MARGE = 14
-const FEN_L = 16
-const FEN_H = 18
-const TOIT = 8
-const SOL_Y = 216
-const CENTRE_X = 180
+function Lettres({ texte, depart = 0 }) {
+  let n = depart
+  const mots = texte.split(' ')
+  return mots.map((mot, m) => (
+    <Fragment key={m}>
+      <span className="lt__mot" aria-hidden="true">
+        {Array.from(mot).map((c, i) => (
+          <span key={i} className="lt__lettre" style={{ '--i': n++ }}>
+            {c}
+          </span>
+        ))}
+      </span>
+      {m < mots.length - 1 && ' '}
+    </Fragment>
+  ))
+}
 
-function ApercuHotel({ nom, etagesHauts, chambresParEtage, chambresRez }) {
-  const niveaux = etagesHauts + 1
-  const total = chambresRez + etagesHauts * chambresParEtage
-  const cellules = Math.max(chambresParEtage, chambresRez, 3)
-  const largeur = cellules * CW + 2 * MARGE
-  const hauteur = niveaux * FH
-  const echelle = Math.min(300 / largeur, 140 / (hauteur + TOIT), 1.6)
-
-  const propre = nom.trim()
-  const nomAffiche = propre ? (propre.length > 24 ? `${propre.slice(0, 23)}…` : propre) : 'Votre hôtel'
-  const largeurEnseigne = Math.min(300, Math.max(96, nomAffiche.length * 8 + 28))
-  const enseigneY = Math.max(4, SOL_Y - (hauteur + TOIT) * echelle - 36)
-
-  const liste = Array.from({ length: niveaux }, (_, i) => i)
-
-  // Étages : une rangée de fenêtres centrée
-  const decalage = ((cellules - chambresParEtage) * CW) / 2
-  const pieces = Array.from({ length: chambresParEtage }, (_, j) => j)
-
-  // Rez-de-chaussée : les fenêtres se placent de part et d'autre de la porte
-  const cellulesRez = Array.from({ length: cellules }, (_, j) => j)
-    .filter((j) => Math.abs(MARGE + j * CW + CW / 2 - largeur / 2) >= 20)
-    .slice(0, chambresRez)
+// ============================================================
+//  FOND : formes de la maquette (même univers que la présentation)
+//  Les trois formes existent en permanence. Celle de l'étape active est en place ;
+//  les précédentes sont sorties en haut à gauche, les suivantes attendent en bas à droite.
+// ============================================================
+function FondVolet({ actif }) {
+  const etat = (i) => (i === actif ? 'actif' : i < actif ? 'passe' : 'futur')
 
   return (
-    <div className="apercu">
-      <svg
-        className="apercu__svg"
-        viewBox="0 0 360 236"
-        role="img"
-        aria-label={`Aperçu du bâtiment : ${pluriel(niveaux, 'niveau', 'niveaux')}, ${pluriel(total, 'chambre')}`}
-      >
-        <rect x="24" y={SOL_Y} width="312" height="3" rx="1.5" className="apercu__sol" />
+    <svg
+      className="volet__fond"
+      viewBox="380 0 760 982"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="reg-g0" gradientUnits="userSpaceOnUse" x1="441.447" y1="525.061" x2="933.58" y2="-3.906">
+          <stop offset="0" stopColor="#0727E6" />
+          <stop offset="1" stopColor="#6038FF" />
+        </linearGradient>
+        <linearGradient id="reg-g1" gradientUnits="userSpaceOnUse" x1="0" y1="691.15" x2="1632.9" y2="691.15">
+          <stop offset="0" stopColor="#0727E6" />
+          <stop offset="0.98" stopColor="#6E38FF" />
+        </linearGradient>
+        <linearGradient id="reg-g2a" gradientUnits="userSpaceOnUse" x1="0" y1="382.98" x2="765.96" y2="382.98">
+          <stop offset="0" stopColor="#5C6CFF" stopOpacity="0.898" />
+          <stop offset="1" stopColor="#0727E6" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="reg-g2b" gradientUnits="userSpaceOnUse" x1="0" y1="775.15" x2="1795.9" y2="775.15">
+          <stop offset="0" stopColor="#0727E6" stopOpacity="0" />
+          <stop offset="1" stopColor="#6229FF" />
+        </linearGradient>
+      </defs>
 
-        <g
-          className="apercu__batiment"
-          style={{
-            transform: `translate(${CENTRE_X}px, ${SOL_Y}px) scale(${echelle}) translate(${-largeur / 2}px, 0px)`
-          }}
-        >
-          <rect x={-4} y={-hauteur - TOIT} width={largeur + 8} height={TOIT} rx={2} className="apercu__toit" />
-          <rect x={0} y={-hauteur} width={largeur} height={hauteur} className="apercu__corps" />
+      <rect width="1512" height="982" fill="#0727E6" />
 
-          {liste.map((niveau) => (
-            <g key={niveau} className="apercu__niveau">
-              {niveau > 0 && (
-                <line
-                  x1={0}
-                  x2={largeur}
-                  y1={-niveau * FH}
-                  y2={-niveau * FH}
-                  className="apercu__separation"
-                />
-              )}
+      <g className={`volet__forme volet__forme--${etat(0)}`}>
+        <path
+          d="M84.22998 685.9986C37.71106 307.13202 362.81274 -44.547791 810.36481 -99.500275C1257.9169 -154.45274 1658.4407 108.13147 1704.9596 486.99805C1751.4786 865.86469 1426.377 1217.5444 978.82483 1272.4968C531.27271 1327.4495 130.74902 1064.8652 84.22998 685.9986Z"
+          fill="url(#reg-g0)"
+          fillOpacity="0.65"
+          transform="matrix(-0.993 -0.122 -0.122 0.993 1682.146 352.652)"
+        />
+      </g>
 
-              {niveau === 0 && chambresRez === 0 && (
-                <>
-                  {/* Pas de chambres au rez-de-chaussée : deux vitrines de réception autour de la porte */}
-                  <rect
-                    x={MARGE}
-                    y={-FH + 7}
-                    width={largeur / 2 - 18 - MARGE}
-                    height={FEN_H + 4}
-                    rx={3}
-                    className="apercu__vitrine"
-                  />
-                  <rect
-                    x={largeur / 2 + 18}
-                    y={-FH + 7}
-                    width={largeur / 2 - 18 - MARGE}
-                    height={FEN_H + 4}
-                    rx={3}
-                    className="apercu__vitrine"
-                  />
-                </>
-              )}
+      <g className={`volet__forme volet__forme--${etat(1)}`}>
+        <ellipse
+          cx="816.45"
+          cy="691.15"
+          rx="816.45"
+          ry="691.15"
+          fill="url(#reg-g1)"
+          fillOpacity="0.65"
+          transform="translate(21.1 248)"
+        />
+      </g>
 
-              {niveau === 0 &&
-                cellulesRez.map((j) => (
-                  <rect
-                    key={j}
-                    x={MARGE + j * CW + (CW - FEN_L) / 2}
-                    y={-FH + 8}
-                    width={FEN_L}
-                    height={FEN_H}
-                    rx={3}
-                    className="apercu__fenetre"
-                  />
-                ))}
+      <g className={`volet__forme volet__forme--decalee volet__forme--${etat(2)}`}>
+        <circle
+          cx="382.98"
+          cy="382.98"
+          r="382.98"
+          fill="url(#reg-g2a)"
+          transform="matrix(0.588 0.809 -0.809 0.588 1440.607 446.872)"
+        />
+        <ellipse
+          cx="897.95"
+          cy="775.15"
+          rx="897.95"
+          ry="775.15"
+          fill="url(#reg-g2b)"
+          transform="translate(-441.9 -821)"
+        />
+      </g>
+    </svg>
+  )
+}
 
-              {niveau > 0 &&
-                pieces.map((j) => (
-                  <rect
-                    key={j}
-                    x={MARGE + decalage + j * CW + (CW - FEN_L) / 2}
-                    y={-(niveau + 1) * FH + 8}
-                    width={FEN_L}
-                    height={FEN_H}
-                    rx={3}
-                    className="apercu__fenetre"
-                  />
-                ))}
-            </g>
-          ))}
+// ============================================================
+//  BÂTIMENT EN PERSPECTIVE 3/4 (SVG)
+//  Deux façades visibles : la grande à gauche (les chambres),
+//  la petite à droite. Le dessin est calculé par une vraie
+//  projection en perspective, puis mis à l'échelle du cadre.
+//  À chaque modification, le bâtiment pivote et zoome.
+// ============================================================
+const CW = 2.4 // largeur d'une travée (unités du dessin)
+const FH = 3.2 // hauteur d'un niveau
+const PROFONDEUR = 3 * CW
+const ANGLE_BASE = (32 * Math.PI) / 180
+const COLONNES_MAX = 10 // au-delà, les fenêtres rétrécissent au lieu d'élargir le bâtiment
+const NIVEAUX_MAX = 12 // idem pour la hauteur
+const VUE = { l: 400, h: 560, sol: 430 }
 
-          <rect x={largeur / 2 - 12} y={-30} width={24} height={30} rx={4} className="apercu__porte" />
-        </g>
+function Batiment({ actif, niveaux, total, etagesHauts, chambresParEtage, chambresRez }) {
+  // --- animation : rotation + zoom à chaque changement -------------------
+  const [anim, setAnim] = useState({ angle: ANGLE_BASE, zoom: 1 })
+  const courant = useRef({ angle: ANGLE_BASE, zoom: 1 })
+  const memoire = useRef(null)
 
-        <g
-          className="apercu__enseigne"
-          style={{ transform: `translate(${CENTRE_X - largeurEnseigne / 2}px, ${enseigneY}px)` }}
-        >
-          <rect width={largeurEnseigne} height={28} rx={8} />
-          <text x={largeurEnseigne / 2} y={19} textAnchor="middle">
-            {nomAffiche}
-          </text>
-        </g>
-      </svg>
-      <p className="apercu__legende">
-        {pluriel(niveaux, 'niveau', 'niveaux')} · {pluriel(total, 'chambre')}
-      </p>
-    </div>
+  useEffect(() => {
+    const avant = memoire.current
+    memoire.current = { total, actif }
+    if (!actif) return undefined
+
+    if (mouvementReduit()) {
+      courant.current = { angle: ANGLE_BASE, zoom: 1 }
+      setAnim(courant.current)
+      return undefined
+    }
+
+    const intro = !avant || !avant.actif // le bâtiment vient d'apparaître
+    const sens = avant && total < avant.total ? -1 : 1 // ajout ou retrait
+    const depart = intro ? 0.7 : clamp(courant.current.angle - ANGLE_BASE + 0.3 * sens, -0.5, 0.8)
+    const zoomDepart = intro ? 0.82 : clamp(courant.current.zoom * (sens > 0 ? 0.92 : 1.08), 0.8, 1.2)
+    const duree = intro ? 1000 : 750
+    const t0 = performance.now()
+    let raf
+
+    const tick = (maintenant) => {
+      const t = Math.min(1, (maintenant - t0) / duree)
+      const e = 1 - (1 - t) ** 3
+      const suivant = {
+        angle: ANGLE_BASE + depart * (1 - e),
+        zoom: 1 + (zoomDepart - 1) * (1 - e)
+      }
+      courant.current = suivant
+      setAnim(suivant)
+      if (t < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [total, etagesHauts, chambresParEtage, chambresRez, actif])
+
+  // --- dimensions ----------------------------------------------------------
+  // Rez-de-chaussée avec chambres : une travée de plus pour la porte
+  const parEtage = etagesHauts > 0 ? chambresParEtage : 0
+  const travees = Math.max(parEtage, chambresRez > 0 ? chambresRez + 1 : 0, 3)
+  const W = Math.min(travees, COLONNES_MAX) * CW
+  const cw = W / travees
+  const D = PROFONDEUR
+  const H = Math.min(niveaux, NIVEAUX_MAX) * FH
+  const fh = H / niveaux
+
+  const saillie = fh * 0.3 // balcons
+  const garde = fh * 0.3 // hauteur des garde-corps
+  const debord = 0.35 // débord du toit
+  const epToit = Math.min(0.6, fh * 0.2)
+  const hTour = Math.min(2.4, fh * 0.8)
+  const zToit = H + epToit
+  const haut = zToit + hTour
+  const tour = { u0: W * 0.3, u1: W * 0.62, v0: D * 0.2, v1: D * 0.7 }
+
+  // --- projection en perspective -----------------------------------------
+  const dirG = [-Math.cos(anim.angle), Math.sin(anim.angle)] // grande façade (x, z)
+  const dirD = [Math.sin(anim.angle), Math.cos(anim.angle)] // petite façade (x, z)
+  const dist = 2.2 * Math.max(W, D, haut)
+  const cam = Math.max(1.7, H * 0.3)
+  const brut = (u, v, h) => {
+    const x = u * dirG[0] + v * dirD[0]
+    const z = u * dirG[1] + v * dirD[1] + dist
+    return [x / z, (cam - h) / z]
+  }
+
+  const repere = [
+    brut(0, 0, 0),
+    brut(0, D, 0),
+    brut(W, 0, 0),
+    brut(W, -saillie, H),
+    brut(-debord, -debord, zToit),
+    brut(W + debord, -debord, zToit),
+    brut(-debord, D + debord, zToit),
+    brut(tour.u0, tour.v0, haut),
+    brut(tour.u1, tour.v0, haut),
+    brut(tour.u0, tour.v1, haut)
+  ]
+  const xs = repere.map((p) => p[0])
+  const ys = repere.map((p) => p[1])
+  const [minX, maxX] = [Math.min(...xs), Math.max(...xs)]
+  const [minY, maxY] = [Math.min(...ys), Math.max(...ys)]
+  const echelle = Math.min(330 / (maxX - minX), (VUE.sol - 40) / (maxY - minY), 22 * dist)
+  const ox = VUE.l / 2 - ((minX + maxX) / 2) * echelle
+  const oy = VUE.sol - maxY * echelle
+
+  const P = (u, v, h) => {
+    const [x, y] = brut(u, v, h)
+    return [ox + x * echelle, oy + y * echelle]
+  }
+  const poly = (...pts) => pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
+  // Rectangle posé sur la grande façade (u = position, h = hauteur)
+  const surG = (u0, u1, h0, h1) => poly(P(u0, 0, h0), P(u1, 0, h0), P(u1, 0, h1), P(u0, 0, h1))
+  // Rectangle posé sur la petite façade (v = position, h = hauteur)
+  const surD = (v0, v1, h0, h1) => poly(P(0, v0, h0), P(0, v1, h0), P(0, v1, h1), P(0, v0, h1))
+
+  // --- éléments ------------------------------------------------------------
+  const fenG = []
+  const fenD = []
+  const vitrines = []
+  const balcons = []
+
+  const fentesD = (n, h0, h1) =>
+    [0.22, 0.6].forEach((p, i) => {
+      const v0 = D * p
+      fenD.push(
+        <polygon key={`d${n}-${i}`} className="apercu__fenetre" points={surD(v0, v0 + D * 0.16, h0, h1)} />
+      )
+    })
+
+  // Étages
+  const decal = (travees - chambresParEtage) / 2
+  for (let n = 1; n <= etagesHauts; n++) {
+    const base = n * fh
+    for (let j = 0; j < chambresParEtage; j++) {
+      const u0 = (decal + j) * cw + cw * 0.2
+      fenG.push(
+        <polygon
+          key={`g${n}-${j}`}
+          className="apercu__fenetre"
+          points={surG(u0, u0 + cw * 0.6, base + fh * 0.14, base + fh * 0.8)}
+        />
+      )
+    }
+    fentesD(n, base + fh * 0.14, base + fh * 0.8)
+    balcons.push(
+      <g key={`b${n}`} className="apercu__balcon">
+        <polygon
+          className="apercu__dalle"
+          points={poly(P(0, 0, base), P(W, 0, base), P(W, -saillie, base), P(0, -saillie, base))}
+        />
+        <polygon
+          className="apercu__garde"
+          points={poly(
+            P(0, -saillie, base),
+            P(W, -saillie, base),
+            P(W, -saillie, base + garde),
+            P(0, -saillie, base + garde)
+          )}
+        />
+      </g>
+    )
+  }
+
+  // Rez-de-chaussée
+  const largPorte = Math.min(1.8, cw * 0.7)
+  const hPorte = fh * 0.78
+  let uPorte
+  if (chambresRez === 0) {
+    // Réception : deux vitrines de part et d'autre de la porte
+    uPorte = W / 2 - largPorte / 2
+    const marge = cw * 0.25
+    const jeu = 0.3
+    ;[
+      [marge, uPorte - jeu],
+      [uPorte + largPorte + jeu, W - marge]
+    ].forEach(([a, b], i) =>
+      vitrines.push(
+        <polygon key={`v${i}`} className="apercu__vitrine" points={surG(a, b, fh * 0.1, fh * 0.82)} />
+      )
+    )
+    vitrines.push(
+      <polygon key="vd" className="apercu__vitrine" points={surD(0.8, D - 0.8, fh * 0.1, fh * 0.82)} />
+    )
+  } else {
+    const places = chambresRez + 1 // les chambres + la porte, au milieu
+    const decalRez = (travees - places) / 2
+    const kPorte = Math.floor(places / 2)
+    for (let j = 0; j < places; j++) {
+      if (j === kPorte) continue
+      const u0 = (decalRez + j) * cw + cw * 0.2
+      fenG.push(
+        <polygon
+          key={`r${j}`}
+          className="apercu__fenetre"
+          points={surG(u0, u0 + cw * 0.6, fh * 0.2, fh * 0.8)}
+        />
+      )
+    }
+    uPorte = (decalRez + kPorte) * cw + cw / 2 - largPorte / 2
+    fentesD(0, fh * 0.2, fh * 0.8)
+  }
+
+  const yPied = P(0, 0, 0)[1]
+  const cx = VUE.l / 2
+
+  return (
+    <svg
+      className="apercu__svg"
+      viewBox={`0 0 ${VUE.l} ${VUE.h}`}
+      role="img"
+      aria-label={`Aperçu du bâtiment : ${pluriel(niveaux, 'niveau', 'niveaux')}, ${pluriel(total, 'chambre')}`}
+    >
+      <g transform={`translate(${cx} ${VUE.sol}) scale(${anim.zoom.toFixed(3)}) translate(${-cx} ${-VUE.sol})`}>
+        <line className="apercu__sol" x1="30" x2="370" y1={yPied} y2={yPied} />
+
+        <polygon className="apercu__face-d" points={poly(P(0, 0, 0), P(0, D, 0), P(0, D, H), P(0, 0, H))} />
+        <polygon className="apercu__face-g" points={poly(P(0, 0, 0), P(W, 0, 0), P(W, 0, H), P(0, 0, H))} />
+
+        {fenD}
+        {fenG}
+        {vitrines}
+        <polygon className="apercu__porte" points={surG(uPorte, uPorte + largPorte, 0, hPorte)} />
+        {balcons}
+
+        {/* Toit : acrotère et petit volume technique */}
+        <polygon
+          className="apercu__toit"
+          points={poly(P(-debord, -debord, H), P(W + debord, -debord, H), P(W + debord, -debord, zToit), P(-debord, -debord, zToit))}
+        />
+        <polygon
+          className="apercu__toit"
+          points={poly(P(-debord, -debord, H), P(-debord, D + debord, H), P(-debord, D + debord, zToit), P(-debord, -debord, zToit))}
+        />
+        <polygon
+          className="apercu__face-g"
+          points={poly(P(tour.u0, tour.v0, zToit), P(tour.u1, tour.v0, zToit), P(tour.u1, tour.v0, haut), P(tour.u0, tour.v0, haut))}
+        />
+        <polygon
+          className="apercu__face-d"
+          points={poly(P(tour.u0, tour.v0, zToit), P(tour.u0, tour.v1, zToit), P(tour.u0, tour.v1, haut), P(tour.u0, tour.v0, haut))}
+        />
+      </g>
+    </svg>
+  )
+}
+
+// ============================================================
+//  PANNEAU GAUCHE
+//  Étapes ordinaires : logo + grand titre écrit lettre par lettre.
+//  Étape « Bâtiment » : les lettres s'envolent, le bâtiment prend la place.
+//  Le fond change de forme à chaque étape, avec entrée et sortie.
+// ============================================================
+function PanneauGauche({ etape, niveaux, total, etagesHauts, chambresParEtage, chambresRez }) {
+  const batiment = etape === ETAPE_BATIMENT
+
+  // Le fond démarre « hors champ » puis entre dès la frame suivante
+  const [pret, setPret] = useState(false)
+  useEffect(() => {
+    let b
+    const a = requestAnimationFrame(() => {
+      b = requestAnimationFrame(() => setPret(true))
+    })
+    return () => {
+      cancelAnimationFrame(a)
+      cancelAnimationFrame(b)
+    }
+  }, [])
+
+  return (
+    <aside className={`volet${batiment ? ' volet--batiment' : ''}`}>
+      <FondVolet actif={pret ? FORME_PAR_ETAPE[etape] : -1} />
+
+      <img className="volet__logo" src={logotypeWhite} alt="Hypnos" />
+
+      <div className="volet__scene">
+        <Batiment
+          actif={batiment}
+          niveaux={niveaux}
+          total={total}
+          etagesHauts={etagesHauts}
+          chambresParEtage={chambresParEtage}
+          chambresRez={chambresRez}
+        />
+      </div>
+
+      <div className={`volet__texte${batiment ? ' volet__texte--sortie' : ''}`} aria-hidden={batiment}>
+        <p className="volet__titre" aria-label="Créez votre hôtel en 2 minutes.">
+          <Lettres texte="Créez votre hôtel en 2 minutes." />
+        </p>
+        <p className="volet__sous">
+          <span className="lt__sr">
+            Renseignez votre établissement et votre compte administrateur : vos chambres sont générées pour
+            vous.
+          </span>
+          <Lettres texte="Renseignez votre établissement et votre compte administrateur : vos chambres sont générées pour vous." />
+        </p>
+      </div>
+    </aside>
   )
 }
 
@@ -220,64 +491,189 @@ function Compteur({ label, valeur, min, max, onChange, aide, alerte }) {
 //  STYLE
 // ============================================================
 const STYLES = `
-/* ---------- Aperçu du bâtiment ---------- */
-.apercu {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  width: 100%;
-  min-height: 0;
+/* ---------- Lettres ---------- */
+.lt__mot {
+  display: inline-block;
+  white-space: nowrap;
 }
+.lt__lettre {
+  display: inline-block;
+  opacity: 0;
+  animation: lt-entree 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--debut, 0ms) + var(--i) * var(--pas, 30ms));
+}
+.lt__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@keyframes lt-entree {
+  from { opacity: 0; transform: translateY(0.45em); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+@keyframes lt-sortie {
+  from { opacity: 1; transform: none; filter: blur(0); }
+  to { opacity: 0; transform: translateY(-0.35em); filter: blur(4px); }
+}
+
+/* ---------- Panneau gauche ---------- */
+.volet {
+  position: relative;
+  display: flex;
+  flex: 0 0 44%;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-width: 0;
+  min-height: 0;
+  padding: 40px;
+  overflow: hidden;
+  color: #fff;
+  background: #0727E6;
+}
+.volet__fond {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.volet__logo {
+  position: absolute;
+  top: 32px;
+  left: 40px;
+  z-index: 2;
+  height: 34px;
+  width: auto;
+}
+
+/* Formes : entrée et sortie */
+.volet__forme {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  will-change: transform, opacity;
+}
+.volet__forme--actif {
+  opacity: 1;
+  transform: none;
+  transition: transform 1.1s cubic-bezier(0.65, 0, 0.25, 1), opacity 0.9s ease 0.15s;
+}
+.volet__forme--passe {
+  opacity: 0;
+  transform: translate(-260px, -140px) scale(1.12) rotate(-6deg);
+  transition: transform 1.1s cubic-bezier(0.65, 0, 0.25, 1), opacity 0.6s ease;
+}
+.volet__forme--futur {
+  opacity: 0;
+  transform: translate(260px, 160px) scale(0.88) rotate(6deg);
+  transition: transform 1.1s cubic-bezier(0.65, 0, 0.25, 1), opacity 0.6s ease;
+}
+.volet__forme--decalee.volet__forme--actif {
+  transition-delay: 0.1s, 0.25s;
+}
+/* Sur l'étape « Bâtiment », le fond s'adoucit pour laisser la place au dessin */
+.volet--batiment .volet__forme--actif {
+  opacity: 0.5;
+}
+
+.volet__texte {
+  position: relative;
+  z-index: 1;
+}
+.volet__titre {
+  --debut: 200ms;
+  --pas: 30ms;
+  margin-bottom: 14px;
+  font-family: var(--font-display);
+  font-size: clamp(28px, 3.1vw, 40px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.volet__sous {
+  --debut: 700ms;
+  --pas: 8ms;
+  max-width: 34ch;
+  font-size: 14px;
+  line-height: 1.55;
+  opacity: 0.85;
+}
+/* Étape « Bâtiment » : les lettres s'envolent (puis restent invisibles) */
+.volet__texte--sortie {
+  pointer-events: none;
+}
+.volet__texte--sortie .lt__lettre {
+  animation: lt-sortie 0.3s ease-in both;
+  animation-delay: min(calc(var(--i) * 5ms), 180ms);
+}
+
+.volet__scene {
+  position: absolute;
+  inset: 76px 24px 24px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  visibility: hidden;
+  opacity: 0;
+  transform: scale(0.94);
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.4s ease, visibility 0s 0.4s;
+}
+.volet--batiment .volet__scene {
+  visibility: visible;
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.5s ease 0.2s, transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s, visibility 0s;
+}
+
+/* ---------- Bâtiment ---------- */
 .apercu__svg {
   width: 100%;
-  max-width: 360px;
-  max-height: 100%;
+  height: 100%;
+  max-width: 460px;
 }
-.apercu__legende {
-  font-size: 14px;
-  font-weight: 500;
-  opacity: 0.9;
-}
-.apercu__batiment,
-.apercu__enseigne {
-  transition: transform 0.35s ease;
+.apercu__svg polygon,
+.apercu__svg line {
+  vector-effect: non-scaling-stroke;
+  stroke: #0727E6;
+  stroke-width: 1;
+  stroke-linejoin: round;
 }
 .apercu__sol {
-  fill: color-mix(in srgb, var(--white) 35%, transparent);
+  stroke: rgba(255, 255, 255, 0.45) !important;
+  stroke-width: 2 !important;
+  stroke-linecap: round;
+}
+.apercu__face-g {
+  fill: rgba(255, 255, 255, 0.96);
+}
+.apercu__face-d {
+  fill: color-mix(in srgb, var(--soft-periwinkle, #b9c0ff) 70%, #fff);
 }
 .apercu__toit {
-  fill: color-mix(in srgb, var(--white) 70%, transparent);
-}
-.apercu__corps {
-  fill: color-mix(in srgb, var(--white) 94%, transparent);
-}
-.apercu__separation {
-  stroke: color-mix(in srgb, var(--color-brand, var(--medium-blue)) 18%, transparent);
-  stroke-width: 1;
+  fill: #fff;
 }
 .apercu__fenetre {
-  fill: var(--color-brand, var(--medium-blue));
-  animation: apercu-apparition 0.3s ease both;
+  fill: color-mix(in srgb, #0727E6 24%, #fff);
+  animation: apercu-apparition 0.4s ease both;
 }
 .apercu__vitrine {
-  fill: color-mix(in srgb, var(--soft-periwinkle) 55%, transparent);
-  animation: apercu-apparition 0.3s ease both;
+  fill: color-mix(in srgb, #0727E6 14%, #fff);
+  animation: apercu-apparition 0.4s ease both;
 }
 .apercu__porte {
-  fill: var(--soft-periwinkle);
+  fill: #0727E6;
 }
-.apercu__niveau {
-  animation: apercu-apparition 0.35s ease both;
+.apercu__balcon {
+  animation: apercu-apparition 0.4s ease both;
 }
-.apercu__enseigne rect {
-  fill: var(--color-brand-contrast, var(--white));
+.apercu__dalle {
+  fill: #fff;
 }
-.apercu__enseigne text {
-  fill: var(--color-brand, var(--medium-blue));
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 600;
+.apercu__garde {
+  fill: color-mix(in srgb, #0727E6 10%, transparent);
 }
 @keyframes apercu-apparition {
   from { opacity: 0; }
@@ -294,6 +690,8 @@ const STYLES = `
   margin-bottom: 22px;
 }
 .wiz__titre {
+  --debut: 40ms;
+  --pas: 22ms;
   font-size: 30px;
 }
 .wiz__corps {
@@ -310,6 +708,9 @@ const STYLES = `
 .wiz__note {
   font-size: 13px;
   color: var(--color-text-muted);
+}
+.wiz__plus {
+  display: flex;
 }
 .wiz__erreur {
   min-height: 20px;
@@ -333,7 +734,7 @@ const STYLES = `
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border: 1px solid var(--color-border);
   border-radius: 14px;
   background: var(--color-surface);
@@ -345,7 +746,8 @@ const STYLES = `
 .compteur__controles {
   display: flex;
   align-items: center;
-  gap: 16px;
+  justify-content: space-between;
+  gap: 8px;
 }
 .compteur__valeur {
   min-width: 3ch;
@@ -394,8 +796,12 @@ const STYLES = `
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .apercu__batiment, .apercu__enseigne { transition: none; }
-  .apercu__fenetre, .apercu__vitrine, .apercu__niveau, .wiz__corps { animation: none; }
+  .lt__lettre,
+  .volet__texte--sortie .lt__lettre { animation: none; opacity: 1; filter: none; transform: none; }
+  .volet__texte--sortie { opacity: 0; }
+  .volet__forme,
+  .volet__scene { transition: none !important; }
+  .apercu__fenetre, .apercu__vitrine, .apercu__balcon, .wiz__corps { animation: none; }
 }
 `
 
@@ -437,6 +843,9 @@ export default function Register({ onTermine }) {
   const [erreurs, setErreurs] = useState({})
   const [erreurGlobale, setErreurGlobale] = useState('')
   const [envoi, setEnvoi] = useState(false)
+  // Champs rarement utiles : repliés tant qu'on n'en a pas besoin
+  const [adresseOuverte, setAdresseOuverte] = useState(false)
+  const [rezOuvert, setRezOuvert] = useState(false)
 
   const maj = (champ) => (e) => {
     const valeur = e.target.value
@@ -552,11 +961,23 @@ export default function Register({ onTermine }) {
             onChange={maj('ville')}
             erreur={erreurs.ville}
           />
-          <div className="wiz__duo">
-            <Input label="Adresse" placeholder="Facultatif" value={form.adresse} onChange={maj('adresse')} />
-            <Input label="Téléphone" placeholder="+242 …" value={form.tel} onChange={maj('tel')} />
-          </div>
-          <p className="wiz__note">L’adresse et le téléphone serviront sur vos factures. Vous pourrez les ajouter plus tard.</p>
+          {adresseOuverte ? (
+            <div className="wiz__duo">
+              <Input
+                label="Adresse"
+                placeholder="Facultatif"
+                value={form.adresse}
+                onChange={maj('adresse')}
+              />
+              <Input label="Téléphone" placeholder="+242 …" value={form.tel} onChange={maj('tel')} />
+            </div>
+          ) : (
+            <div className="wiz__plus">
+              <Button variante="lien" taille="s" onClick={() => setAdresseOuverte(true)}>
+                Ajouter l’adresse et le téléphone (pour vos factures)
+              </Button>
+            </div>
+          )}
         </>
       )
     }
@@ -564,53 +985,53 @@ export default function Register({ onTermine }) {
     if (etape === 1) {
       return (
         <>
-          <Compteur
-            label="Étages avec chambres"
-            valeur={form.etagesHauts}
-            min={form.chambresRez === 0 ? 1 : 0}
-            max={ETAGES_MAX}
-            onChange={(v) => regler('etagesHauts', v)}
-            aide={
-              form.etagesHauts === 0
-                ? 'Aucun étage : rez-de-chaussée uniquement.'
-                : form.etagesHauts === 1
-                  ? '1er étage.'
-                  : `Du 1er au ${form.etagesHauts}e étage.`
-            }
-            alerte={alerteEtages}
-          />
-          <Compteur
-            label="Chambres par étage"
-            valeur={form.chambresParEtage}
-            min={1}
-            max={CHAMBRES_MAX}
-            onChange={(v) => regler('chambresParEtage', v)}
-            aide="Le même nombre à chaque étage : vous ajusterez ensuite dans l’onglet Chambres."
-            alerte={alerteChambres}
-          />
-          <Compteur
-            label="Chambres au rez-de-chaussée"
-            valeur={form.chambresRez}
-            min={0}
-            max={CHAMBRES_MAX}
-            onChange={(v) =>
-              setForm((f) => ({
-                ...f,
-                chambresRez: v,
-                // Sans chambre au rez-de-chaussée, il faut au moins un étage
-                etagesHauts: v === 0 ? Math.max(1, f.etagesHauts) : f.etagesHauts
-              }))
-            }
-            aide="Rare : le rez-de-chaussée accueille en général la réception et les espaces communs, pour préserver l’intimité des clients."
-          />
+          <div className="wiz__duo">
+            <Compteur
+              label="Étages"
+              valeur={form.etagesHauts}
+              min={form.chambresRez === 0 ? 1 : 0}
+              max={ETAGES_MAX}
+              onChange={(v) => regler('etagesHauts', v)}
+              aide={form.etagesHauts === 1 ? '1er étage' : `Du 1er au ${form.etagesHauts}e`}
+              alerte={alerteEtages}
+            />
+            <Compteur
+              label="Chambres par étage"
+              valeur={form.chambresParEtage}
+              min={1}
+              max={CHAMBRES_MAX}
+              onChange={(v) => regler('chambresParEtage', v)}
+              alerte={alerteChambres}
+            />
+          </div>
+          {rezOuvert ? (
+            <Compteur
+              label="Chambres au rez-de-chaussée"
+              valeur={form.chambresRez}
+              min={0}
+              max={CHAMBRES_MAX}
+              onChange={(v) =>
+                setForm((f) => ({
+                  ...f,
+                  chambresRez: v,
+                  // Sans chambre au rez-de-chaussée, il faut au moins un étage
+                  etagesHauts: v === 0 ? Math.max(1, f.etagesHauts) : f.etagesHauts
+                }))
+              }
+              aide="Rare : le rez-de-chaussée accueille en général la réception."
+            />
+          ) : (
+            <div className="wiz__plus">
+              <Button variante="lien" taille="s" onClick={() => setRezOuvert(true)}>
+                Ajouter des chambres au rez-de-chaussée
+              </Button>
+            </div>
+          )}
           {erreurs.batiment && (
             <p className="compteur__alerte" role="alert">
               {erreurs.batiment}
             </p>
           )}
-          <p className="wiz__note">
-            {pluriel(total, 'chambre')} seront créées, numérotées de 1 à {total}.
-          </p>
         </>
       )
     }
@@ -628,7 +1049,6 @@ export default function Register({ onTermine }) {
             value={form.tarif}
             onChange={maj('tarif')}
             erreur={erreurs.tarif}
-            aide={`${formatArgent(Number(form.tarif) || 0)} ${DEVISE} par nuit`}
           />
           <div className="wiz__duo">
             <Input
@@ -646,10 +1066,7 @@ export default function Register({ onTermine }) {
               erreur={erreurs.depart}
             />
           </div>
-          <p className="wiz__note">
-            Une catégorie « Standard » sera créée à ce tarif pour toutes vos chambres. Vous pourrez en
-            ajouter d’autres ensuite.
-          </p>
+          <p className="wiz__note">Une catégorie « Standard » sera créée à ce tarif pour toutes vos chambres.</p>
         </>
       )
     }
@@ -683,25 +1100,27 @@ export default function Register({ onTermine }) {
             onChange={maj('email')}
             erreur={erreurs.email}
           />
-          <Input
-            label="Mot de passe"
-            type="password"
-            requis
-            autoComplete="new-password"
-            value={form.motDePasse}
-            onChange={maj('motDePasse')}
-            erreur={erreurs.motDePasse}
-            aide="8 caractères minimum."
-          />
-          <Input
-            label="Confirmation"
-            type="password"
-            requis
-            autoComplete="new-password"
-            value={form.confirmation}
-            onChange={maj('confirmation')}
-            erreur={erreurs.confirmation}
-          />
+          <div className="wiz__duo">
+            <Input
+              label="Mot de passe"
+              type="password"
+              requis
+              placeholder="8 caractères minimum"
+              autoComplete="new-password"
+              value={form.motDePasse}
+              onChange={maj('motDePasse')}
+              erreur={erreurs.motDePasse}
+            />
+            <Input
+              label="Confirmation"
+              type="password"
+              requis
+              autoComplete="new-password"
+              value={form.confirmation}
+              onChange={maj('confirmation')}
+              erreur={erreurs.confirmation}
+            />
+          </div>
         </>
       )
     }
@@ -721,28 +1140,21 @@ export default function Register({ onTermine }) {
             </div>
           ))}
         </div>
-        <p className="wiz__note">
-          Tout est enregistré sur cet ordinateur, sans connexion internet. Vous pourrez modifier les
-          chambres et les tarifs ensuite.
-        </p>
+        <p className="wiz__note">Tout est enregistré sur cet ordinateur, sans connexion internet.</p>
       </>
     )
   }
 
   return (
     <div className="auth">
-      <PanneauMarque
-        compact
-        titre="Créez votre hôtel en 2 minutes."
-        texte="Renseignez votre établissement et votre compte administrateur : vos chambres sont générées pour vous."
-      >
-        <ApercuHotel
-          nom={form.nom}
-          etagesHauts={form.etagesHauts}
-          chambresParEtage={form.chambresParEtage}
-          chambresRez={form.chambresRez}
-        />
-      </PanneauMarque>
+      <PanneauGauche
+        etape={etape}
+        niveaux={niveaux}
+        total={total}
+        etagesHauts={form.etagesHauts}
+        chambresParEtage={form.chambresParEtage}
+        chambresRez={form.chambresRez}
+      />
 
       <main className="auth__principal">
         <form className="auth__formulaire wiz" onSubmit={soumettre} noValidate>
@@ -753,7 +1165,9 @@ export default function Register({ onTermine }) {
             valeur={((etape + 1) / ETAPES.length) * 100}
             libelle="Progression de la création de l’hôtel"
           />
-          <h1 className="auth__titre wiz__titre">{ETAPES[etape].titre}</h1>
+          <h1 className="auth__titre wiz__titre" key={etape} aria-label={ETAPES[etape].titre}>
+            <Lettres texte={ETAPES[etape].titre} />
+          </h1>
           <p className="auth__sous-titre">{ETAPES[etape].aide}</p>
 
           <div className="wiz__corps" key={etape}>

@@ -1,438 +1,386 @@
 <!DOCTYPE html>
 <html lang="fr" class="scroll-smooth">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hypnos - Logiciel de Gestion Hôtelière</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Clash Display Font (500 Medium) -->
-    <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500&display=swap" rel="stylesheet">
-    <!-- Inter Font -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hypnos – Logiciel de gestion d’hôtel (PMS) pour Windows et Mac</title>
+  <meta name="description" content="Hypnos : planning des réservations, statuts en couleur, chiffres du jour et revenu planifié. Téléchargez le logiciel de gestion d’hôtel pour Windows ou macOS.">
+  <link rel="canonical" href="https://www.hypnos.space/">
+  <meta name="theme-color" content="#141CC5">
 
-    <!-- GSAP & ScrollTrigger CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="./assets/favicon.png">
+  <link rel="apple-touch-icon" href="./assets/favicon.png">
 
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        clash: ['Clash Display', 'sans-serif'],
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        brand: {
-                            blue: '#141CC5',
-                            dark: '#0a0e68',
-                            light: '#2a32eb'
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        /* Modern Soft Mesh Glow matching exact image artwork */
-        .hero-bg-canvas {
-            background-color: #141CC5;
-            position: relative;
-            overflow: hidden;
-        }
+  <!-- Open Graph (aperçu WhatsApp, Facebook, LinkedIn…) : affiche Logiciel.png -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Hypnos">
+  <meta property="og:locale" content="fr_FR">
+  <meta property="og:url" content="https://www.hypnos.space/">
+  <meta property="og:title" content="Hypnos – Logiciel de gestion d’hôtel (PMS)">
+  <meta property="og:description" content="Planning des réservations, statuts en couleur et revenu planifié. Téléchargez Hypnos pour Windows ou Mac.">
+  <meta property="og:image" content="https://www.hypnos.space/assets/Logiciel.png">
+  <meta property="og:image:secure_url" content="https://www.hypnos.space/assets/Logiciel.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1089">
+  <meta property="og:image:height" content="1144">
+  <meta property="og:image:alt" content="Hypnos, logiciel de gestion d’hôtel : le planning des réservations affiché sur un MacBook Air">
 
-        /* Glowing Orbs imitating planets/soft volumetric light */
-        .orb-1 {
-            position: absolute;
-            top: 20%;
-            left: -10%;
-            width: 55vw;
-            height: 55vw;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(70, 95, 255, 0.45) 0%, rgba(20, 28, 197, 0) 70%);
-            filter: blur(60px);
-            pointer-events: none;
-        }
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Hypnos – Logiciel de gestion d’hôtel (PMS)">
+  <meta name="twitter:description" content="Planning des réservations, statuts en couleur et revenu planifié. Pour Windows et Mac.">
+  <meta name="twitter:image" content="https://www.hypnos.space/assets/Logiciel.png">
+  <meta name="twitter:image:alt" content="Hypnos, logiciel de gestion d’hôtel : le planning des réservations affiché sur un MacBook Air">
+  <script>document.documentElement.classList.add('js')</script>
 
-        .orb-2 {
-            position: absolute;
-            top: 15%;
-            right: -5%;
-            width: 45vw;
-            height: 45vw;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(90, 120, 255, 0.35) 0%, rgba(20, 28, 197, 0) 65%);
-            filter: blur(50px);
-            pointer-events: none;
-        }
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        fontFamily: { clash: ['"Clash Display"', 'sans-serif'], sans: ['Inter', 'sans-serif'] },
+        colors: { brand: { DEFAULT: '#141CC5', dark: '#0a0e68', light: '#3b46ff' } },
+      } },
+    }
+  </script>
 
-        .orb-center-light {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 70vw;
-            height: 40vw;
-            border-radius: 50%;
-            background: radial-gradient(ellipse at center, rgba(120, 150, 255, 0.25) 0%, rgba(20, 28, 197, 0) 70%);
-            filter: blur(80px);
-            pointer-events: none;
-        }
+  <!-- Polices : Clash Display Medium (titre) + Inter (tout le reste) -->
+  <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-        /* Soft dark shadow cleft under title matching original screenshot */
-        .shadow-v-cleft {
-            position: absolute;
-            bottom: 5%;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 35vw;
-            height: 25vw;
-            background: radial-gradient(ellipse at bottom, rgba(5, 8, 80, 0.6) 0%, rgba(20, 28, 197, 0) 75%);
-            filter: blur(40px);
-            pointer-events: none;
-        }
-    </style>
+  <!-- Icônes : Font Awesome (CDN) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <style>
+    .glow-a,.glow-b,.planet{position:absolute;border-radius:9999px;pointer-events:none}
+    .glow-a{width:80vmax;height:80vmax;left:-30vmax;top:-20vmax;background:radial-gradient(circle,#3b46ff 0%,rgba(20,28,197,0) 62%);opacity:.8}
+    .glow-b{width:70vmax;height:70vmax;right:-28vmax;bottom:-30vmax;background:radial-gradient(circle,#0a0e68 0%,rgba(10,14,104,0) 65%)}
+    .planet-big{width:min(62vw,720px);aspect-ratio:1;left:50%;bottom:-24%;transform:translateX(-50%) rotate(-24deg);
+      background:radial-gradient(circle at 70% 25%,#c7c4ff 0%,#8d86f5 30%,rgba(90,80,230,.55) 55%,rgba(20,28,197,0) 72%);filter:blur(26px);opacity:.85}
+    .planet-small{width:min(24vw,280px);aspect-ratio:1;right:9%;top:18%;
+      background:radial-gradient(circle at 35% 30%,#9aa6ff,rgba(80,100,255,.4) 55%,rgba(20,28,197,0) 72%);filter:blur(14px);opacity:.7}
+    @keyframes rise{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
+    .rise{animation:rise 1s cubic-bezier(.2,.7,.2,1) both}
+    .js .reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
+    .js .reveal.in{opacity:1;transform:none}
+    details>summary{list-style:none;cursor:pointer}
+    details>summary::-webkit-details-marker{display:none}
+    details[open] .chev{transform:rotate(180deg)}
+  </style>
 </head>
-<body class="font-sans antialiased bg-white text-slate-900 selection:bg-blue-100 selection:text-brand-blue overflow-x-hidden">
 
-    <!-- HERO SECTION (Full viewport height & width, blue background with mesh light) -->
-    <section class="hero-bg-canvas min-h-screen w-full text-white flex flex-col justify-between px-6 sm:px-12 md:px-16 py-8 relative">
-        
-        <!-- Background Orbs Layer -->
-        <div class="orb-1"></div>
-        <div class="orb-2"></div>
-        <div class="orb-center-light"></div>
-        <div class="shadow-v-cleft"></div>
+<body class="font-sans antialiased bg-white text-slate-900 overflow-x-hidden">
 
-        <!-- Header -->
-        <header class="flex items-center justify-between w-full max-w-7xl mx-auto z-10 hero-anim">
-            <!-- Brand Logo -->
-            <a href="#" class="flex items-center gap-3 group">
-                <div class="bg-white/10 p-2 rounded-xl backdrop-blur-md border border-white/20 transition-transform group-hover:scale-105">
-                    <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
-                    </svg>
-                </div>
-                <span class="font-sans text-2xl font-bold tracking-tight">Hypnos</span>
-            </a>
+  <!-- ===================== HERO ===================== -->
+  <section class="relative isolate min-h-screen bg-brand text-white flex flex-col px-5 sm:px-10 lg:px-16 py-6 overflow-hidden">
+    <div class="glow-a"></div><div class="glow-b"></div>
+    <div class="planet planet-big"></div><div class="planet planet-small"></div>
 
-            <!-- Télécharger Button (Nav) -->
-            <a href="#download" 
-               class="bg-white text-brand-blue hover:bg-slate-100 transition-all duration-300 px-7 py-2.5 rounded-full font-sans font-semibold text-sm shadow-md hover:shadow-lg active:scale-95">
-                Télécharger
-            </a>
-        </header>
+    <header class="relative z-10 flex items-center justify-between rise">
+      <a href="#" aria-label="Hypnos – accueil">
+        <img src="./assets/logotype_white.png" alt="Hypnos" class="h-9 sm:h-10 w-auto">
+      </a>
+      <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-white/85">
+        <a href="#fonctionnalites" class="hover:text-white transition">Fonctionnalités</a>
+        <a href="#installation" class="hover:text-white transition">Installation</a>
+        <a href="#faq" class="hover:text-white transition">Questions</a>
+      </nav>
+      <a href="#telecharger" class="bg-white text-brand font-semibold text-sm px-6 py-2.5 rounded-full hover:bg-indigo-50 active:scale-95 transition">Télécharger</a>
+    </header>
 
-        <!-- Giant Title Hero (CLASH DISPLAY MEDIUM) -->
-        <div class="my-auto text-center z-10 py-8 sm:py-12">
-            <h1 id="hero-title" class="font-clash font-medium text-7xl sm:text-9xl md:text-[12rem] lg:text-[15rem] tracking-tight leading-none select-none text-white drop-shadow-sm">
-                Hypnos
-            </h1>
+    <div class="relative z-10 flex-1 flex flex-col items-center justify-center text-center py-10">
+      <p class="rise text-xs sm:text-sm font-semibold uppercase tracking-[.25em] text-white/70 mb-4" style="animation-delay:.1s">Logiciel de gestion d’hôtel (PMS)</p>
+      <h1 class="rise font-clash font-medium leading-[.95] tracking-tighter select-none text-[clamp(4.5rem,21vw,16rem)]" style="animation-delay:.2s">Hypnos</h1>
+      <p class="rise mt-6 max-w-xl text-base sm:text-lg text-white/85 leading-relaxed" style="animation-delay:.35s">
+        Le planning de toutes vos chambres sur un seul écran : réservations, statuts, chiffres du jour et revenu planifié, directement sur votre ordinateur.
+      </p>
+      <div class="rise mt-8 flex flex-col sm:flex-row gap-3 w-full sm:w-auto" style="animation-delay:.5s">
+        <a href="#telecharger" class="inline-flex items-center justify-center gap-2.5 bg-white text-brand font-semibold px-8 py-4 rounded-full shadow-xl hover:bg-indigo-50 active:scale-95 transition">
+          <i class="fa-solid fa-download"></i><span>Télécharger Hypnos <span id="hero-os" class="font-medium"></span></span>
+        </a>
+        <a href="https://wa.me/242067756084?text=Bonjour%2C%20je%20souhaite%20en%20savoir%20plus%20sur%20le%20logiciel%20Hypnos" target="_blank" rel="noopener"
+           class="inline-flex items-center justify-center gap-2.5 bg-green-500 hover:bg-green-600 text-white font-semibold px-8 py-4 rounded-full shadow-xl active:scale-95 transition">
+          <i class="fa-brands fa-whatsapp text-xl"></i><span>Poser une question</span>
+        </a>
+      </div>
+    </div>
+
+    <ul class="relative z-10 flex flex-wrap justify-center gap-x-8 gap-y-2 text-xs sm:text-sm text-white/80 pb-2 rise" style="animation-delay:.65s">
+      <li><i class="fa-brands fa-windows mr-2"></i>Windows</li>
+      <li><i class="fa-brands fa-apple mr-2"></i>macOS</li>
+      <li><i class="fa-solid fa-rotate mr-2"></i>Mises à jour automatiques</li>
+      <li><i class="fa-brands fa-whatsapp mr-2"></i>Assistance WhatsApp</li>
+    </ul>
+  </section>
+
+  <!-- ===================== FONCTIONNALITÉS ===================== -->
+  <section id="fonctionnalites" class="scroll-mt-4 px-5 py-20 sm:py-28">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-center max-w-2xl mx-auto mb-14 reveal">
+        <span class="inline-block text-xs font-bold uppercase tracking-widest text-brand bg-brand/10 px-4 py-1.5 rounded-full">Fonctionnalités</span>
+        <h2 class="mt-4 text-3xl sm:text-5xl font-extrabold tracking-tight text-brand uppercase">Tout pour gérer votre hôtel</h2>
+        <p class="mt-4 text-slate-600 text-base sm:text-lg leading-relaxed">Fini les cahiers et les tableaux compliqués : Hypnos met l’essentiel à portée de clic.</p>
+      </div>
+
+      <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="reveal group rounded-3xl border border-slate-200 p-7 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand/10 transition duration-300">
+          <div class="w-12 h-12 rounded-2xl bg-brand/10 text-brand grid place-items-center text-xl mb-5 group-hover:bg-brand group-hover:text-white transition"><i class="fa-solid fa-calendar-days"></i></div>
+          <h3 class="text-lg font-bold mb-2">Planning des réservations</h3>
+          <p class="text-sm text-slate-600 leading-relaxed">Toutes vos chambres sur une timeline par jour. Cliquez pour le détail, glissez pour déplacer, étirez les bords pour allonger un séjour, double-cliquez sur une case libre pour créer.</p>
+        </div>
+        <div class="reveal group rounded-3xl border border-slate-200 p-7 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand/10 transition duration-300">
+          <div class="w-12 h-12 rounded-2xl bg-brand/10 text-brand grid place-items-center text-xl mb-5 group-hover:bg-brand group-hover:text-white transition"><i class="fa-solid fa-palette"></i></div>
+          <h3 class="text-lg font-bold mb-2">Statuts en couleur</h3>
+          <p class="text-sm text-slate-600 leading-relaxed">Confirmée, en séjour, en attente de paiement, terminée ou bloquée : l’état de chaque réservation se lit au premier regard.</p>
+        </div>
+        <div class="reveal group rounded-3xl border border-slate-200 p-7 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand/10 transition duration-300">
+          <div class="w-12 h-12 rounded-2xl bg-brand/10 text-brand grid place-items-center text-xl mb-5 group-hover:bg-brand group-hover:text-white transition"><i class="fa-solid fa-gauge-high"></i></div>
+          <h3 class="text-lg font-bold mb-2">Les chiffres du jour</h3>
+          <p class="text-sm text-slate-600 leading-relaxed">Chambres occupées aujourd’hui, nuitées planifiées et revenu planifié en XAF, affichés en haut du planning.</p>
+        </div>
+        <div class="reveal group rounded-3xl border border-slate-200 p-7 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand/10 transition duration-300">
+          <div class="w-12 h-12 rounded-2xl bg-brand/10 text-brand grid place-items-center text-xl mb-5 group-hover:bg-brand group-hover:text-white transition"><i class="fa-solid fa-bed"></i></div>
+          <h3 class="text-lg font-bold mb-2">Chambres par catégorie</h3>
+          <p class="text-sm text-slate-600 leading-relaxed">Standard, double, suite ou familiale : retrouvez vos chambres classées par étage et par type.</p>
+        </div>
+        <div class="reveal group rounded-3xl border border-slate-200 p-7 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand/10 transition duration-300">
+          <div class="w-12 h-12 rounded-2xl bg-brand/10 text-brand grid place-items-center text-xl mb-5 group-hover:bg-brand group-hover:text-white transition"><i class="fa-solid fa-screwdriver-wrench"></i></div>
+          <h3 class="text-lg font-bold mb-2">Chambres bloquées</h3>
+          <p class="text-sm text-slate-600 leading-relaxed">Bloquez une chambre pour une maintenance (climatisation, travaux…) afin qu’elle ne soit jamais réservée par erreur.</p>
+        </div>
+        <div class="reveal group rounded-3xl border border-slate-200 p-7 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand/10 transition duration-300">
+          <div class="w-12 h-12 rounded-2xl bg-brand/10 text-brand grid place-items-center text-xl mb-5 group-hover:bg-brand group-hover:text-white transition"><i class="fa-solid fa-rotate"></i></div>
+          <h3 class="text-lg font-bold mb-2">Toujours à jour</h3>
+          <p class="text-sm text-slate-600 leading-relaxed">Les nouvelles versions se téléchargent automatiquement : vous n’avez rien à réinstaller.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== INSTALLATION EN 3 ÉTAPES ===================== -->
+  <section id="installation" class="scroll-mt-4 bg-slate-50 border-y border-slate-200 px-5 py-20 sm:py-24">
+    <div class="max-w-5xl mx-auto">
+      <div class="text-center mb-14 reveal">
+        <h2 class="text-3xl sm:text-4xl font-bold tracking-tight">Prêt en 3 minutes</h2>
+        <p class="mt-3 text-slate-600">Aucune compétence technique nécessaire.</p>
+      </div>
+      <div class="grid gap-6 md:grid-cols-3">
+        <div class="reveal text-center">
+          <div class="mx-auto mb-5 w-14 h-14 rounded-full bg-brand text-white grid place-items-center text-xl font-bold shadow-lg shadow-brand/30">1</div>
+          <h3 class="font-bold mb-1">Téléchargez</h3>
+          <p class="text-sm text-slate-600">Choisissez la version pour Windows ou Mac ci-dessous.</p>
+        </div>
+        <div class="reveal text-center">
+          <div class="mx-auto mb-5 w-14 h-14 rounded-full bg-brand text-white grid place-items-center text-xl font-bold shadow-lg shadow-brand/30">2</div>
+          <h3 class="font-bold mb-1">Installez</h3>
+          <p class="text-sm text-slate-600">Ouvrez le fichier téléchargé et suivez l’assistant d’installation.</p>
+        </div>
+        <div class="reveal text-center">
+          <div class="mx-auto mb-5 w-14 h-14 rounded-full bg-brand text-white grid place-items-center text-xl font-bold shadow-lg shadow-brand/30">3</div>
+          <h3 class="font-bold mb-1">Utilisez</h3>
+          <p class="text-sm text-slate-600">Lancez Hypnos et commencez à gérer vos chambres.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TÉLÉCHARGEMENT ===================== -->
+  <section id="telecharger" class="scroll-mt-4 px-5 py-20 sm:py-28">
+    <div class="max-w-4xl mx-auto text-center">
+      <span class="inline-block text-xs font-bold uppercase tracking-widest text-brand bg-brand/10 px-4 py-1.5 rounded-full reveal">Téléchargement</span>
+      <h2 class="mt-4 mb-3 text-3xl sm:text-5xl font-extrabold tracking-tight reveal">Obtenez Hypnos</h2>
+      <p class="text-slate-600 mb-3 reveal">Choisissez votre système d’exploitation.</p>
+      <p id="version" class="text-xs font-semibold text-slate-500 mb-10 min-h-[1rem] reveal"></p>
+
+      <!-- Message affiché uniquement sur téléphone / tablette -->
+      <div id="mobile-note" class="hidden mb-8 max-w-xl mx-auto bg-amber-50 border border-amber-200 rounded-2xl p-5 text-left">
+        <p class="text-sm font-semibold text-amber-900 mb-1"><i class="fa-solid fa-laptop mr-2"></i>Hypnos s’installe sur ordinateur</p>
+        <p class="text-sm text-amber-800 mb-4">Envoyez-vous ce lien sur WhatsApp pour le télécharger depuis votre PC ou votre Mac.</p>
+        <a id="mobile-share" href="#" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition">
+          <i class="fa-brands fa-whatsapp"></i>M’envoyer le lien
+        </a>
+      </div>
+
+      <div class="grid gap-6 md:grid-cols-2 text-left">
+        <!-- Windows -->
+        <div id="card-win" class="reveal relative bg-white rounded-3xl border-2 border-slate-200 p-8 sm:p-10 flex flex-col transition duration-300 hover:shadow-2xl hover:shadow-brand/15">
+          <span data-reco class="hidden absolute -top-3 left-8 bg-brand text-white text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full">Recommandé pour vous</span>
+          <div class="w-16 h-16 rounded-2xl bg-brand/10 text-brand grid place-items-center text-4xl mb-6"><i class="fa-brands fa-windows"></i></div>
+          <h3 class="text-2xl font-bold">Windows</h3>
+          <p class="text-sm text-slate-500 mt-1 mb-6">Windows 10 et 11 (64 bits)</p>
+          <ul class="space-y-3 text-sm text-slate-600 mb-8 flex-1">
+            <li><i class="fa-solid fa-check text-green-500 mr-2"></i>Installation en un clic (.exe)</li>
+            <li><i class="fa-solid fa-check text-green-500 mr-2"></i>Mises à jour automatiques</li>
+          </ul>
+          <a id="dl-win" href="https://github.com/Ebana27/hypnos-update-history/releases/latest" class="text-center bg-brand hover:bg-brand-dark text-white font-semibold py-4 rounded-2xl shadow-md active:scale-[.98] transition">
+            <i class="fa-solid fa-download mr-2"></i>Télécharger pour Windows
+          </a>
         </div>
 
-        <!-- Hero Bottom Info & WhatsApp Direct Contact -->
-        <div class="w-full max-w-7xl mx-auto z-10 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6 pb-4 hero-anim">
-            <p class="max-w-xs sm:max-w-md text-xs sm:text-sm md:text-base text-blue-100/90 font-normal leading-relaxed">
-                In This Regard, The Design Of The Formal Action Manages To Obtain The Development Of Indicative Capacity.
-            </p>
-
-            <a href="https://wa.me/242067750684?text=Bonjour,%20je%20souhaite%20en%20savoir%20plus%20sur%20le%20logiciel%20Hypnos" 
-               target="_blank"
-               class="inline-flex items-center gap-3 bg-emerald-500 hover:bg-emerald-600 text-white font-sans font-medium px-5 py-3 rounded-full shadow-lg transition-all duration-300 active:scale-95 text-sm group">
-                <i class="fa-brands fa-whatsapp text-lg transition-transform group-hover:scale-110"></i>
-                <span>Contact +242 06 775 06 84</span>
-            </a>
+        <!-- macOS -->
+        <div id="card-mac" class="reveal relative bg-white rounded-3xl border-2 border-slate-200 p-8 sm:p-10 flex flex-col transition duration-300 hover:shadow-2xl hover:shadow-brand/15">
+          <span data-reco class="hidden absolute -top-3 left-8 bg-brand text-white text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full">Recommandé pour vous</span>
+          <div class="w-16 h-16 rounded-2xl bg-slate-100 text-slate-900 grid place-items-center text-4xl mb-6"><i class="fa-brands fa-apple"></i></div>
+          <h3 class="text-2xl font-bold">macOS</h3>
+          <p class="text-sm text-slate-500 mt-1 mb-6">Mac avec puce Apple ou Intel</p>
+          <ul class="space-y-3 text-sm text-slate-600 mb-6 flex-1">
+            <li><i class="fa-solid fa-check text-green-500 mr-2"></i>Image disque (.dmg)</li>
+            <li><i class="fa-solid fa-check text-green-500 mr-2"></i>Compatible Retina et mode sombre</li>
+          </ul>
+          <a id="dl-mac-arm" href="https://github.com/Ebana27/hypnos-update-history/releases/latest" class="text-center bg-slate-900 hover:bg-slate-800 text-white font-semibold py-4 rounded-2xl shadow-md active:scale-[.98] transition">
+            <i class="fa-solid fa-download mr-2"></i>Mac puce Apple (M1, M2, M3…)
+          </a>
+          <a id="dl-mac-intel" href="https://github.com/Ebana27/hypnos-update-history/releases/latest" class="mt-3 text-center border border-slate-300 hover:bg-slate-50 text-slate-800 font-semibold py-3.5 rounded-2xl active:scale-[.98] transition text-sm">
+            Mac Intel (ancien modèle)
+          </a>
+          <p class="mt-3 text-xs text-slate-500">Pas sûr ? Menu <i class="fa-brands fa-apple"></i> → « À propos de ce Mac » : si vous voyez « Puce », choisissez Apple.</p>
         </div>
+      </div>
 
-    </section>
-
-    <!-- SECTION 2: MACBOOK SCREEN & TIMELINE DISPLAY -->
-    <section class="bg-white py-16 sm:py-24 px-6 relative z-10">
-        <div class="max-w-5xl mx-auto flex flex-col items-center text-center">
-            
-            <!-- Laptop Device Mockup -->
-            <div id="pc-mockup" class="w-full mb-12 sm:mb-16 opacity-0">
-                <img 
-                    src="https://cdn-za.icons8.com/2bU2Y3linkSdZBiF7eNLpw/l7iry-G4IUq_F-8TrKD6hg/Macbook-Air-127.0.0.1.png" 
-                    alt="Aperçu de l'interface Hypnos sur MacBook Air" 
-                    class="w-full h-auto max-w-4xl mx-auto drop-shadow-2xl"
-                    loading="eager"
-                />
-            </div>
-
-            <!-- Timeline Screen Title (Inter Font) -->
-            <h2 id="timeline-title" class="font-sans text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-brand-blue uppercase mb-4 opacity-0">
-                TIMELINE SCREEN
-            </h2>
-
-            <!-- Timeline Screen Subtitle (Inter Font) -->
-            <p id="timeline-text" class="font-sans text-slate-600 max-w-xl text-sm sm:text-base md:text-lg font-normal leading-relaxed opacity-0">
-                Let's Consider, That A Lot Of Effort Has Been Invested Into The Functional Testing.
-            </p>
-
+      <!-- Aide : avertissements de sécurité normaux (application non signée) -->
+      <div class="mt-10 text-left bg-slate-50 border border-slate-200 rounded-2xl p-6 reveal">
+        <h3 class="font-bold mb-3"><i class="fa-solid fa-shield-halved text-brand mr-2"></i>Un message de sécurité s’affiche à l’installation ?</h3>
+        <div class="grid gap-4 sm:grid-cols-2 text-sm text-slate-600 leading-relaxed">
+          <p><b class="text-slate-900"><i class="fa-brands fa-windows mr-1"></i>Windows :</b> si « Windows a protégé votre ordinateur » apparaît, cliquez sur <b>Informations complémentaires</b>, puis sur <b>Exécuter quand même</b>.</p>
+          <p><b class="text-slate-900"><i class="fa-brands fa-apple mr-1"></i>Mac :</b> faites un clic droit sur Hypnos puis <b>Ouvrir</b>, ou allez dans Réglages Système → Confidentialité et sécurité → <b>Ouvrir quand même</b>.</p>
         </div>
-    </section>
+      </div>
+    </div>
+  </section>
 
-    <!-- SECTION 3: DOWNLOAD SECTION (Windows & macOS Cards) -->
-    <section id="download" class="bg-slate-50 py-20 px-6 border-t border-slate-100 relative z-10">
-        <div class="max-w-6xl mx-auto">
-            
-            <div class="text-center max-w-2xl mx-auto mb-16">
-                <span class="text-xs font-bold uppercase tracking-widest text-brand-blue bg-blue-50 px-4 py-1.5 rounded-full inline-block mb-3">Téléchargement</span>
-                <h2 class="font-sans text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight mb-4">
-                    Obtenez Hypnos sur votre ordinateur
-                </h2>
-                <p class="font-sans text-slate-600 text-sm sm:text-base">
-                    Choisissez votre système d'exploitation pour installer l'application complète et optimiser votre gestion hôtelière dès aujourd'hui.
-                </p>
-            </div>
+  <!-- ===================== FAQ ===================== -->
+  <section id="faq" class="scroll-mt-4 bg-slate-50 border-t border-slate-200 px-5 py-20 sm:py-24">
+    <div class="max-w-2xl mx-auto">
+      <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-center mb-10 reveal">Questions fréquentes</h2>
+      <div class="space-y-3">
+        <details class="reveal group bg-white border border-slate-200 rounded-2xl p-5">
+          <summary class="flex items-center justify-between gap-4 font-semibold">Sur quels ordinateurs fonctionne Hypnos ?<i class="chev fa-solid fa-chevron-down text-slate-400 text-sm transition"></i></summary>
+          <p class="mt-3 text-sm text-slate-600 leading-relaxed">Sur Windows 10 et 11 (64 bits) ainsi que sur Mac, avec puce Apple ou Intel.</p>
+        </details>
+        <details class="reveal group bg-white border border-slate-200 rounded-2xl p-5">
+          <summary class="flex items-center justify-between gap-4 font-semibold">Comment mettre Hypnos à jour ?<i class="chev fa-solid fa-chevron-down text-slate-400 text-sm transition"></i></summary>
+          <p class="mt-3 text-sm text-slate-600 leading-relaxed">Les mises à jour sont récupérées automatiquement. Vous n’avez pas besoin de revenir sur ce site.</p>
+        </details>
+        <details class="reveal group bg-white border border-slate-200 rounded-2xl p-5">
+          <summary class="flex items-center justify-between gap-4 font-semibold">Windows ou macOS bloque l’installation, est-ce normal ?<i class="chev fa-solid fa-chevron-down text-slate-400 text-sm transition"></i></summary>
+          <p class="mt-3 text-sm text-slate-600 leading-relaxed">Oui, c’est un avertissement habituel pour les logiciels récents. Suivez les étapes indiquées dans la section Téléchargement pour continuer l’installation.</p>
+        </details>
+        <details class="reveal group bg-white border border-slate-200 rounded-2xl p-5">
+          <summary class="flex items-center justify-between gap-4 font-semibold">Comment obtenir de l’aide ?<i class="chev fa-solid fa-chevron-down text-slate-400 text-sm transition"></i></summary>
+          <p class="mt-3 text-sm text-slate-600 leading-relaxed">Écrivez-nous sur WhatsApp au +242 06 775 60 84, nous répondons 7 jours sur 7.</p>
+        </details>
+      </div>
+    </div>
+  </section>
 
-            <!-- Download Cards Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-                
-                <!-- Windows Card -->
-                <div class="download-card bg-white rounded-3xl p-8 sm:p-10 border border-slate-200/80 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:border-brand-blue/30 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full blur-2xl -mr-10 -mt-10 group-hover:bg-blue-100 transition-colors"></div>
-                    <div>
-                        <div class="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-brand-blue mb-6 border border-blue-100 group-hover:scale-110 transition-transform">
-                            <!-- Windows Official SVG Icon -->
-                            <svg class="w-8 h-8 fill-current" viewBox="0 0 88 88" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M0 12.402l35.687-4.859v34.502H0V12.402zm0 63.196l35.687 4.859V46.046H0v29.552zm39.81 5.437L88 88V46.046H39.81v35.011zm0-70.046v34.464H88V0L39.81 10.989z"/>
-                            </svg>
-                        </div>
-                        <h3 class="font-sans text-2xl font-bold text-slate-900 mb-2">Windows</h3>
-                        <p class="font-sans text-sm text-slate-500 mb-6">Compatible avec Windows 10 & 11 (64-bit)</p>
-                        
-                        <ul class="space-y-2.5 text-xs sm:text-sm text-slate-600 mb-8">
-                            <li class="flex items-center gap-2">
-                                <i class="fa-solid fa-check text-emerald-500"></i>
-                                <span>Installation rapide (.exe)</span>
-                            </li>
-                            <li class="flex items-center gap-2">
-                                <i class="fa-solid fa-check text-emerald-500"></i>
-                                <span>Mises à jour automatiques incluses</span>
-                            </li>
-                            <li class="flex items-center gap-2">
-                                <i class="fa-solid fa-check text-emerald-500"></i>
-                                <span>Performances optimisées pour PC</span>
-                            </li>
-                        </ul>
-                    </div>
-
-                    <a href="https://wa.me/242067750684?text=Bonjour,%20je%20souhaite%20recevoir%20le%20lien%20de%20t%C3%A9l%C3%A9chargement%20Hypnos%20pour%20Windows" 
-                       target="_blank"
-                       class="w-full py-4 bg-brand-blue hover:bg-brand-dark text-white font-sans font-semibold text-center rounded-2xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2 active:scale-98">
-                        <i class="fa-solid fa-download text-sm"></i>
-                        <span>Télécharger pour Windows</span>
-                    </a>
-                </div>
-
-                <!-- macOS Card -->
-                <div class="download-card bg-white rounded-3xl p-8 sm:p-10 border border-slate-200/80 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:border-brand-blue/30 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-slate-100 rounded-full blur-2xl -mr-10 -mt-10 group-hover:bg-slate-200 transition-colors"></div>
-                    <div>
-                        <div class="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-900 mb-6 border border-slate-200 group-hover:scale-110 transition-transform">
-                            <!-- macOS Apple Official SVG Icon -->
-                            <svg class="w-8 h-8 fill-current" viewBox="0 0 170 170">
-                                <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-5.04.12-9.97-1.93-14.8-6.14-3.26-2.72-7.2-7.4-11.83-14.04-6.3-9.06-11.25-18.96-14.84-29.7-3.59-10.74-5.39-21.2-5.39-31.37 0-14.35 3.84-26.17 11.53-35.46 7.69-9.29 17.34-14.07 28.96-14.35 4.8 0 10.15 1.2 16.06 3.6 5.9 2.4 9.94 3.67 12.1 3.8 2.39-.24 6.75-1.57 13.09-3.99 6.34-2.42 11.52-3.51 15.54-3.26 12.39.95 22.3 5.49 29.74 13.62-10.96 6.64-16.32 15.77-16.08 27.38.24 9.07 3.65 16.8 10.23 23.19 6.58 6.39 14.67 10.01 24.28 10.86-2.58 7.55-6.09 15.22-10.53 23.01zM119.22 31.94c0-6.75 2.45-13.23 7.35-19.44 4.9-6.21 11.11-10.26 18.63-12.15.53 2.58.62 5.06.27 7.44-.7 4.79-2.73 9.49-6.09 14.1-3.36 4.61-7.55 8.16-12.57 10.65-.64.33-1.63.63-2.97.9-1.34.27-2.88.42-4.62.5z"/>
-                            </svg>
-                        </div>
-                        <h3 class="font-sans text-2xl font-bold text-slate-900 mb-2">macOS</h3>
-                        <p class="font-sans text-sm text-slate-500 mb-6">Apple Silicon (M1/M2/M3) & Intel</p>
-                        
-                        <ul class="space-y-2.5 text-xs sm:text-sm text-slate-600 mb-8">
-                            <li class="flex items-center gap-2">
-                                <i class="fa-solid fa-check text-emerald-500"></i>
-                                <span>Image disque universelle (.dmg)</span>
-                            </li>
-                            <li class="flex items-center gap-2">
-                                <i class="fa-solid fa-check text-emerald-500"></i>
-                                <span>Support complet Retina & Dark Mode</span>
-                            </li>
-                            <li class="flex items-center gap-2">
-                                <i class="fa-solid fa-check text-emerald-500"></i>
-                                <span>Sécurisé et optimisé pour Mac</span>
-                            </li>
-                        </ul>
-                    </div>
-
-                    <a href="https://wa.me/242067750684?text=Bonjour,%20je%20souhaite%20recevoir%20le%20lien%20de%20t%C3%A9l%C3%A9chargement%20Hypnos%20pour%20macOS" 
-                       target="_blank"
-                       class="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-sans font-semibold text-center rounded-2xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2 active:scale-98">
-                        <i class="fa-solid fa-download text-sm"></i>
-                        <span>Télécharger pour macOS</span>
-                    </a>
-                </div>
-
-            </div>
-
-            <!-- WhatsApp Help Box -->
-            <div class="mt-12 max-w-xl mx-auto bg-emerald-50/80 border border-emerald-200/60 rounded-2xl p-5 text-center flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div class="flex items-center gap-3 text-left">
-                    <div class="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
-                        <i class="fa-brands fa-whatsapp text-xl"></i>
-                    </div>
-                    <div>
-                        <h4 class="font-sans font-bold text-slate-900 text-sm">Besoin d'aide pour l'installation ?</h4>
-                        <p class="font-sans text-xs text-slate-600">Assistance directe via WhatsApp</p>
-                    </div>
-                </div>
-                <a href="https://wa.me/242067750684?text=Bonjour,%20j'ai%20besoin%20d'aide%20pour%20installer%20le%20logiciel%20Hypnos" 
-                   target="_blank"
-                   class="bg-emerald-600 hover:bg-emerald-700 text-white font-sans font-semibold text-xs px-5 py-2.5 rounded-xl transition-all duration-200 whitespace-nowrap">
-                    Contact +242 06 775 06 84
-                </a>
-            </div>
-
+  <!-- ===================== CTA FINAL ===================== -->
+  <section class="px-5 py-20">
+    <div class="relative isolate max-w-5xl mx-auto overflow-hidden rounded-[2rem] bg-brand text-white text-center px-6 py-16 sm:py-20 reveal">
+      <div class="glow-a"></div>
+      <div class="relative">
+        <h2 class="font-clash font-medium text-4xl sm:text-6xl tracking-tight mb-4">Prêt à simplifier votre hôtel ?</h2>
+        <p class="text-white/80 mb-8 max-w-lg mx-auto">Téléchargez Hypnos ou parlez-nous de votre établissement sur WhatsApp.</p>
+        <div class="flex flex-col sm:flex-row gap-3 justify-center">
+          <a href="#telecharger" class="bg-white text-brand font-semibold px-8 py-4 rounded-full hover:bg-indigo-50 active:scale-95 transition"><i class="fa-solid fa-download mr-2"></i>Télécharger</a>
+          <a href="https://wa.me/242067756084" target="_blank" rel="noopener" class="bg-green-500 hover:bg-green-600 text-white font-semibold px-8 py-4 rounded-full active:scale-95 transition"><i class="fa-brands fa-whatsapp mr-2"></i>+242 06 775 60 84</a>
         </div>
-    </section>
+      </div>
+    </div>
+  </section>
 
-    <!-- FOOTER AGRANDI & STRUCTURÉ -->
-    <footer class="bg-slate-900 text-white py-16 px-6 relative z-10 border-t border-slate-800">
-        <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
-            
-            <!-- Col 1: Brand Info -->
-            <div class="md:col-span-2 space-y-4">
-                <div class="flex items-center gap-3">
-                    <div class="bg-brand-blue p-2 rounded-xl text-white">
-                        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
-                        </svg>
-                    </div>
-                    <span class="font-sans text-2xl font-bold tracking-tight text-white">Hypnos</span>
-                </div>
-                <p class="font-sans text-slate-400 text-sm max-w-sm leading-relaxed">
-                    Logiciel professionnel de gestion hôtelière et système de réservation en ligne interactif. Conçu pour simplifier le planning et optimiser l'occupation.
-                </p>
-            </div>
+  <!-- ===================== FOOTER ===================== -->
+  <footer class="relative overflow-hidden bg-slate-900 text-white px-5 pt-16 pb-7">
+    <div class="relative z-10 max-w-6xl mx-auto grid gap-10 md:grid-cols-4 mb-14">
+      <div class="md:col-span-2">
+        <img src="./assets/logotype_white.png" alt="Hypnos" class="h-10 w-auto mb-4">
+        <p class="text-slate-400 text-sm max-w-sm leading-relaxed">Logiciel professionnel de gestion hôtelière. Conçu pour simplifier le planning, les réservations et le suivi de l’occupation.</p>
+      </div>
+      <div>
+        <h4 class="text-xs font-bold uppercase tracking-widest mb-4">Navigation</h4>
+        <ul class="space-y-3 text-sm text-slate-400">
+          <li><a class="hover:text-white transition" href="#fonctionnalites">Fonctionnalités</a></li>
+          <li><a class="hover:text-white transition" href="#installation">Installation</a></li>
+          <li><a class="hover:text-white transition" href="#telecharger">Téléchargement</a></li>
+          <li><a class="hover:text-white transition" href="#faq">Questions fréquentes</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="text-xs font-bold uppercase tracking-widest mb-4">Support et contact</h4>
+        <ul class="space-y-3 text-sm text-slate-400">
+          <li><a class="text-green-400 font-semibold hover:text-green-300 transition" href="https://wa.me/242067756084" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp mr-2"></i>+242 06 775 60 84</a></li>
+          <li class="text-xs text-slate-500">Assistance disponible 7j/7.</li>
+        </ul>
+      </div>
+    </div>
 
-            <!-- Col 2: Téléchargement -->
-            <div>
-                <h4 class="font-sans font-bold text-white text-base mb-4 uppercase tracking-wider text-xs">Téléchargements</h4>
-                <ul class="space-y-3 font-sans text-sm text-slate-400">
-                    <li>
-                        <a href="https://wa.me/242067750684?text=Lien%20Windows" target="_blank" class="hover:text-white transition-colors flex items-center gap-2">
-                            <i class="fa-brands fa-windows text-xs"></i> Version Windows (.exe)
-                        </a>
-                    </li>
-                    <li>
-                        <a href="https://wa.me/242067750684?text=Lien%20macOS" target="_blank" class="hover:text-white transition-colors flex items-center gap-2">
-                            <i class="fa-brands fa-apple text-xs"></i> Version macOS (.dmg)
-                        </a>
-                    </li>
-                </ul>
-            </div>
+    <p class="font-clash font-medium text-center leading-none tracking-tighter text-[clamp(5rem,26vw,22rem)] text-white/[.06] select-none -mb-[3vw]" aria-hidden="true">Hypnos</p>
 
-            <!-- Col 3: Contact WhatsApp Unique -->
-            <div>
-                <h4 class="font-sans font-bold text-white text-base mb-4 uppercase tracking-wider text-xs">Support & Contact</h4>
-                <ul class="space-y-3 font-sans text-sm text-slate-400">
-                    <li>
-                        <a href="https://wa.me/242067750684" target="_blank" class="hover:text-emerald-400 transition-colors inline-flex items-center gap-2 text-emerald-400 font-semibold">
-                            <i class="fa-brands fa-whatsapp text-lg"></i> +242 06 775 06 84
-                        </a>
-                    </li>
-                    <li class="text-xs text-slate-500">
-                        Support client disponible 7j/7 pour accompagnement et installation.
-                    </li>
-                </ul>
-            </div>
+    <div class="relative z-10 max-w-6xl mx-auto pt-6 border-t border-slate-800 flex flex-col sm:flex-row justify-between gap-3 text-xs text-slate-500">
+      <p>© 2026 Hypnos. Tous droits réservés.</p>
+      <p>Conçu pour l’excellence hôtelière.</p>
+    </div>
+  </footer>
 
-        </div>
+  <!-- Bouton WhatsApp flottant -->
+  <a href="https://wa.me/242067756084?text=Bonjour%2C%20j%E2%80%99ai%20une%20question%20sur%20Hypnos" target="_blank" rel="noopener" aria-label="Nous écrire sur WhatsApp"
+     class="fixed z-50 bottom-5 right-5 w-14 h-14 rounded-full bg-green-500 hover:bg-green-600 text-white text-3xl grid place-items-center shadow-2xl active:scale-90 transition">
+    <i class="fa-brands fa-whatsapp"></i>
+  </a>
 
-        <!-- Bottom Bar -->
-        <div class="max-w-7xl mx-auto pt-8 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 font-sans">
-            <p>&copy; 2026 Hypnos. Tous droits réservés.</p>
-            <p>Conçu pour l'excellence hôtelière.</p>
-        </div>
-    </footer>
+  <script>
+    (function () {
+      var REPO = "Ebana27/hypnos-update-history";
+      var ua = navigator.userAgent;
 
-    <!-- GSAP ANIMATIONS SCRIPTS -->
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            gsap.registerPlugin(ScrollTrigger);
+      // --- Détection de l'appareil ---
+      var isMobile = /Android|iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+      var os = isMobile ? null : (/Macintosh|Mac OS X/i.test(ua) ? "mac" : (/Windows/i.test(ua) ? "win" : null));
 
-            // 1. Hero Load Fade & Entrance Animations
-            const heroTl = gsap.timeline({ defaults: { ease: "power3.out" } });
+      if (os) {
+        document.getElementById("hero-os").textContent = os === "mac" ? "pour Mac" : "pour Windows";
+        var card = document.getElementById("card-" + os);
+        card.classList.replace("border-slate-200", "border-brand");
+        card.querySelector("[data-reco]").classList.remove("hidden");
+      }
+      if (isMobile) {
+        document.getElementById("mobile-note").classList.remove("hidden");
+        var link = location.href.split("#")[0] + "#telecharger";
+        document.getElementById("mobile-share").href =
+          "https://wa.me/?text=" + encodeURIComponent("Hypnos – à télécharger depuis un ordinateur : " + link);
+      }
 
-            heroTl
-                .from(".hero-anim", {
-                    y: -25,
-                    opacity: 0,
-                    duration: 1,
-                    stagger: 0.15
-                })
-                .from("#hero-title", {
-                    y: 70,
-                    opacity: 0,
-                    scale: 0.96,
-                    duration: 1.2
-                }, "-=0.6");
+      // --- Liens de téléchargement directs depuis la dernière release GitHub ---
+      fetch("https://api.github.com/repos/" + REPO + "/releases/latest")
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+        .then(function (rel) {
+          var assets = rel.assets || [];
+          var exe = assets.filter(function (a) { return /\.exe$/i.test(a.name); })[0];
+          var dmgs = assets.filter(function (a) { return /\.dmg$/i.test(a.name); });
+          var arm = dmgs.filter(function (a) { return /arm64/i.test(a.name); })[0];
+          var intel = dmgs.filter(function (a) { return !/arm64/i.test(a.name); })[0];
 
-            // 2. PC Mockup Scroll Trigger Reveal
-            gsap.to("#pc-mockup", {
-                scrollTrigger: {
-                    trigger: "#pc-mockup",
-                    start: "top 85%",
-                    toggleActions: "play none none reverse"
-                },
-                opacity: 1,
-                scale: 1,
-                y: 0,
-                duration: 1.2,
-                ease: "power3.out",
-                startAt: { scale: 0.92, y: 50 }
-            });
+          if (exe) document.getElementById("dl-win").href = exe.browser_download_url;
+          if (arm) document.getElementById("dl-mac-arm").href = arm.browser_download_url;
+          if (intel) document.getElementById("dl-mac-intel").href = intel.browser_download_url;
+          else if (dmgs[0]) document.getElementById("dl-mac-intel").href = dmgs[0].browser_download_url;
 
-            // 3. Timeline Title & Subtitle GSAP Animation
-            gsap.to("#timeline-title", {
-                scrollTrigger: {
-                    trigger: "#timeline-title",
-                    start: "top 85%",
-                    toggleActions: "play none none reverse"
-                },
-                opacity: 1,
-                y: 0,
-                duration: 1,
-                ease: "power3.out",
-                startAt: { y: 35 }
-            });
+          var d = new Date(rel.published_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+          document.getElementById("version").textContent = "Dernière version : " + (rel.tag_name || "") + " · publiée le " + d;
+        })
+        .catch(function () { /* en cas d'échec, les liens mènent à la page de la release */ });
 
-            gsap.to("#timeline-text", {
-                scrollTrigger: {
-                    trigger: "#timeline-text",
-                    start: "top 85%",
-                    toggleActions: "play none none reverse"
-                },
-                opacity: 1,
-                y: 0,
-                duration: 1,
-                delay: 0.15,
-                ease: "power3.out",
-                startAt: { y: 25 }
-            });
-
-            // 4. Download Cards Entrance
-            gsap.from(".download-card", {
-                scrollTrigger: {
-                    trigger: "#download",
-                    start: "top 75%",
-                    toggleActions: "play none none reverse"
-                },
-                y: 40,
-                opacity: 0,
-                duration: 1,
-                stagger: 0.2,
-                ease: "power3.out"
-            });
-        });
-    </script>
+      // --- Apparition au scroll ---
+      var els = document.querySelectorAll(".reveal");
+      if ("IntersectionObserver" in window) {
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+        }, { threshold: 0.12 });
+        els.forEach(function (el) { io.observe(el); });
+      } else { els.forEach(function (el) { el.classList.add("in"); }); }
+    })();
+  </script>
 </body>
 </html>

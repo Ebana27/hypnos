@@ -1,8 +1,8 @@
 import { app, shell, BrowserWindow, ipcMain, Menu, dialog, nativeTheme } from 'electron'
-import { join } from 'path'
+import { join, basename, extname } from 'path'
 import fs from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { and, eq, gt, inArray, lt, ne, or, sql, getTableColumns } from 'drizzle-orm'
+import { and, eq, inArray, or, sql, getTableColumns } from 'drizzle-orm'
 import { migrate } from 'drizzle-orm/libsql/migrator'
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'crypto'
 import { promisify } from 'util'
@@ -15,6 +15,8 @@ import {
   demande,
   facture,
   hotel,
+  MODES_PAIEMENT,
+  mouvementCaisse,
   reservation,
   service,
   typeDeChambre,
@@ -32,6 +34,12 @@ let session = null // { userId } de la personne connectée
 
 const db = getDb()
 const scrypt = promisify(scryptCallback)
+
+// Date du jour en heure locale, au format AAAA-MM-JJ
+const jourLocal = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 // ============================================================
 //  MESURE DU DÉMARRAGE (développement uniquement)
@@ -289,6 +297,45 @@ async function initialiserBase() {
     console.warn(`Aucun dossier de migrations (${dossier}) : tables non créées automatiquement.`)
   }
 
+  // Complète de façon idempotente les colonnes introduites par les tarifs flexibles.
+  // Les anciennes lignes conservent leurs tarifs nuit; les tarifs ajoutés démarrent à 0.
+  if (prete) {
+    const ajouterColonnes = async (table, colonnes) => {
+      const existantes = await db.all(sql.raw(`PRAGMA table_info(\"${table}\")`))
+      if (!existantes.length) return
+      const noms = new Set(existantes.map((c) => c.name))
+      for (const [nom, definition] of colonnes) {
+        if (!noms.has(nom)) await db.run(sql.raw(`ALTER TABLE \"${table}\" ADD COLUMN \"${nom}\" ${definition}`))
+      }
+    }
+    await ajouterColonnes('type_de_chambre', [
+      ['prix_horaire', 'INTEGER NOT NULL DEFAULT 0'],
+      ['regle_passage', "TEXT NOT NULL DEFAULT 'prorata'"],
+    ])
+    await ajouterColonnes('chambre', [
+      ['climatisation', 'INTEGER NOT NULL DEFAULT 0'],
+      ['television', 'INTEGER NOT NULL DEFAULT 0']
+    ])
+    await ajouterColonnes('client', [
+      ['allergies', "TEXT NOT NULL DEFAULT ''"],
+      ['info_generales', "TEXT NOT NULL DEFAULT ''"],
+      ['vip', 'INTEGER NOT NULL DEFAULT 0']
+    ])
+    await ajouterColonnes('reservation', [
+      ['type_sejour', "TEXT NOT NULL DEFAULT 'nuit'"],
+      ['mode_tarif', "TEXT NOT NULL DEFAULT 'nuit'"],
+      ['regle_arrondi', "TEXT NOT NULL DEFAULT 'prorata'"],
+      ['tarif_applique', 'INTEGER NOT NULL DEFAULT 0'],
+      ['nombre_adultes', 'INTEGER NOT NULL DEFAULT 1'],
+      ['nombre_enfants', 'INTEGER NOT NULL DEFAULT 0'],
+      ['type_groupe', "TEXT NOT NULL DEFAULT 'seul'"],
+      ['demandes_speciales', "TEXT NOT NULL DEFAULT ''"],
+      ['conditions_paiement', "TEXT NOT NULL DEFAULT ''"],
+      ['mode_paiement', "TEXT NOT NULL DEFAULT 'especes'"],
+      ['numero_paiement', "TEXT NOT NULL DEFAULT ''"]
+    ])
+  }
+
   // Après les migrations, car elles manipulent cette option.
   await db.run(sql`PRAGMA foreign_keys = ON`)
   return prete
@@ -313,7 +360,8 @@ const MESSAGES_CONTRAINTES = {
   reservation_min_une_personne: 'Il faut au moins une personne.',
   service_prix_min: 'Le prix ne peut pas être négatif.',
   consommation_quantite_min: 'La quantité doit être d’au moins 1.',
-  facture_total_coherent: 'Le total doit être égal au montant de l’hébergement plus celui des services.'
+  facture_total_coherent: 'Le total doit être égal au montant de l’hébergement plus celui des services.',
+  mouvement_montant_min: 'Le montant doit être supérieur à 0.'
 }
 
 function traduireErreur(e) {
@@ -380,7 +428,7 @@ function filtrerChamps(table, data, interdits) {
 }
 
 const INTERDITS_CREATION = ['id', 'createdAt', 'updatedAt']
-const INTERDITS_MISE_A_JOUR = ['id', 'createdAt', 'updatedAt', 'remoteId']
+const INTERDITS_MISE_A_JOUR = ['id', 'createdAt', 'updatedAt', 'remoteId', 'createdBy']
 
 // ============================================================
 //  RÈGLES PAR TABLE (exécutées avant création / mise à jour)
@@ -398,15 +446,87 @@ async function verifierTypeChambre(data, mode) {
     if (trouve.length === 0) throw new ErreurMetier("Ce type de chambre n'existe pas.")
     data.typeId = Number(data.typeId)
   }
+  // Tout changement de statut est daté (nettoyage depuis N min, notifications…)
+  if (data.statut !== undefined) data.statutDepuis = new Date().toISOString()
   return data
 }
 
-// Réservations qui bloquent une chambre. Les statuts « en_sejour » et « en_attente »
-// sont déjà pris en compte pour le jour où ils seront ajoutés au schéma.
-const STATUTS_ACTIFS = ['confirmee', 'en_sejour', 'en_attente']
+// Paramètres de l'hôtel : heures « HH:MM:SS » valides, marge de nettoyage entre 0 et 240 minutes
+async function verifierTarifsTypeChambre(data, mode) {
+  const valeurs = ['prix', 'prixHoraire']
+  for (const champ of valeurs) {
+    if (mode === 'create' && data[champ] === undefined && champ !== 'prixHoraire' && champ !== 'prixAccesReservation' && champ !== 'prixAccesEntree') {
+      throw new ErreurMetier('Le tarif par nuit est obligatoire.')
+    }
+    if (data[champ] !== undefined) {
+      const montant = Number(data[champ])
+      if (!Number.isInteger(montant) || montant < 0) throw new ErreurMetier('Les tarifs doivent être des montants entiers positifs ou nuls en XAF.')
+      data[champ] = montant
+    }
+  }
+  if (data.reglePassage !== undefined && !['prorata', 'heure_commencee'].includes(data.reglePassage)) throw new ErreurMetier('Règle de tarification passage invalide.')
+  if (mode === 'create') {
+    data.reglePassage ??= 'prorata'
+    data.prixHoraire ??= 0
+    data.prixAccesReservation ??= 0
+    data.prixAccesEntree ??= 0
+  }
+  return data
+}
 
-// Interdit deux réservations actives qui se chevauchent sur une même chambre
+async function verifierHotel(data) {
+  const heureValide = (h) => /^([01]\d|2[0-3]):[0-5]\d:00$/.test(String(h))
+  for (const champ of ['heureArrivee', 'heureDepart']) {
+    if (data[champ] !== undefined && !heureValide(data[champ])) {
+      throw new ErreurMetier('Les heures indiquées ne sont pas valides.')
+    }
+  }
+  if (data.margeNettoyageMinutes !== undefined) {
+    const marge = Number(data.margeNettoyageMinutes)
+    if (!Number.isInteger(marge) || marge < 0 || marge > 240) {
+      throw new ErreurMetier('La marge de nettoyage doit être comprise entre 0 et 240 minutes.')
+    }
+    data.margeNettoyageMinutes = marge
+  }
+  return data
+}
+
+// Réservations qui bloquent une chambre.
+// « paiement en attente » n'est pas un statut enregistré : c'est un séjour terminé avec un reste à payer.
+const STATUTS_ACTIFS = ['confirmee', 'en_sejour']
+
+// Interdit deux réservations actives qui se chevauchent sur une même chambre,
+// et toute réservation sur une chambre hors service ou marquée en nettoyage
 async function verifierDisponibilite(data, mode, id) {
+  const reglesArrondi = ['prorata', 'heure_commencee']
+  if (data.typeSejour !== undefined && !['nuit', 'heure'].includes(data.typeSejour)) throw new ErreurMetier('Type de séjour invalide.')
+  if (data.modeTarif !== undefined && !['nuit', 'heure'].includes(data.modeTarif)) throw new ErreurMetier('Le tarif se configure dans la catégorie de chambre.')
+  if (data.regleArrondi !== undefined && !reglesArrondi.includes(data.regleArrondi)) throw new ErreurMetier('Règle de facturation horaire invalide.')
+  if (data.tarifApplique !== undefined) {
+    const tarif = Number(data.tarifApplique)
+    if (!Number.isInteger(tarif) || tarif < 0) throw new ErreurMetier('Le tarif appliqué doit être un montant entier positif ou nul en XAF.')
+    data.tarifApplique = tarif
+  }
+  if (data.nombreAdultes !== undefined) {
+    const n = Number(data.nombreAdultes)
+    if (!Number.isInteger(n) || n < 1) throw new ErreurMetier('Il faut au moins un adulte.')
+    data.nombreAdultes = n
+  }
+  if (data.nombreEnfants !== undefined) {
+    const n = Number(data.nombreEnfants)
+    if (!Number.isInteger(n) || n < 0) throw new ErreurMetier('Le nombre d’enfants doit être positif ou nul.')
+    data.nombreEnfants = n
+  }
+  if (data.typeGroupe !== undefined && !['seul', 'groupe'].includes(data.typeGroupe)) throw new ErreurMetier('Le type de client est invalide.')
+  if (data.modePaiement !== undefined && !['especes', 'carte', 'mtn_money', 'airtel_money'].includes(data.modePaiement)) throw new ErreurMetier('Le moyen de paiement est invalide.')
+  if (data.numeroPaiement !== undefined) {
+    const numero = String(data.numeroPaiement).trim()
+    if (numero.length > 30 || (numero && !/^[+0-9() .-]{6,30}$/.test(numero))) throw new ErreurMetier('Le numéro Mobile Money est invalide.')
+    data.numeroPaiement = numero
+  }
+  if (data.modePaiement !== undefined && ['mtn_money', 'airtel_money'].includes(data.modePaiement) && mode === 'create' && !String(data.numeroPaiement ?? '').trim()) throw new ErreurMetier('Saisissez le numéro associé au portefeuille Mobile Money choisi.')
+  if (data.conditionsPaiement !== undefined && !['', 'acompte_solde', 'total_arrivee', 'prepayee', 'facturation_societe'].includes(data.conditionsPaiement)) throw new ErreurMetier('Les conditions de paiement sont invalides.')
+  if (data.nombreAdultes !== undefined && data.nombreEnfants !== undefined && data.nombreDePersonne !== undefined && Number(data.nombreAdultes) + Number(data.nombreEnfants) !== Number(data.nombreDePersonne)) throw new ErreurMetier('Le total des adultes et des enfants ne correspond pas au nombre de personnes.')
   const concerne = ['chambreId', 'dateDebut', 'dateFin', 'statut'].some((c) => c in data)
   if (mode === 'update' && !concerne) return data
 
@@ -420,45 +540,191 @@ async function verifierDisponibilite(data, mode, id) {
   const final = { statut: 'confirmee', ...actuel, ...data }
   if (!STATUTS_ACTIFS.includes(final.statut)) return data
   if (!final.chambreId || !final.dateDebut || !final.dateFin) return data
+  const datesModifiees = mode === 'create' || data.dateDebut !== undefined || data.dateFin !== undefined
+  if (datesModifiees) {
+    const dateHeureLocaleValide = (v) => /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(v)) && !Number.isNaN(new Date(String(v)).getTime())
+    if (!dateHeureLocaleValide(final.dateDebut) || !dateHeureLocaleValide(final.dateFin)) {
+      throw new ErreurMetier('Renseignez une date et une heure valides pour l’arrivée et le départ.')
+    }
+  }
 
+  const [ch] = await db
+    .select({ statut: chambre.statut, typeId: chambre.typeId })
+    .from(chambre)
+    .where(eq(chambre.id, Number(final.chambreId)))
+  if (ch?.statut === 'maintenance') throw new ErreurMetier('Cette chambre est hors service.')
+  if (ch?.statut === 'nettoyage') {
+    throw new ErreurMetier('Cette chambre est en cours de nettoyage et doit être libérée par l’équipe avant toute réservation.')
+  }
+  const actualiserTarifCategorie = mode === 'create' || data.chambreId !== undefined || data.typeSejour !== undefined
+  if (actualiserTarifCategorie && final.typeSejour === 'heure' && ch?.typeId) {
+    const [categorie] = await db.select().from(typeDeChambre).where(eq(typeDeChambre.id, ch.typeId))
+    if (!categorie) throw new ErreurMetier('Catégorie de chambre introuvable.')
+    final.modeTarif = 'heure'
+    final.tarifApplique = Number(categorie.prixHoraire || 0)
+    final.regleArrondi = categorie.reglePassage || 'prorata'
+  } else if (actualiserTarifCategorie && final.typeSejour === 'nuit' && ch?.typeId) {
+    const [categorie] = await db.select().from(typeDeChambre).where(eq(typeDeChambre.id, ch.typeId))
+    if (categorie) {
+      final.modeTarif = 'nuit'
+      final.tarifApplique = Number(categorie.prix || 0)
+    }
+  }
+
+  // Lire les réservations actives de la chambre puis normaliser les anciennes dates AAAA-MM-JJ.
+  // Les séjours historiques par nuit sont interprétés aux heures d'arrivée/départ de l'hôtel.
   const conflits = await db
-    .select({ id: reservation.id })
+    .select({ id: reservation.id, dateDebut: reservation.dateDebut, dateFin: reservation.dateFin })
     .from(reservation)
-    .where(
-      and(
-        eq(reservation.chambreId, Number(final.chambreId)),
-        inArray(reservation.statut, STATUTS_ACTIFS),
-        lt(reservation.dateDebut, final.dateFin),
-        gt(reservation.dateFin, final.dateDebut),
-        mode === 'update' ? ne(reservation.id, Number(id)) : undefined
-      )
-    )
-  if (conflits.length > 0) {
-    throw new ErreurMetier('Cette chambre est déjà réservée sur cette période.')
+    .where(and(eq(reservation.chambreId, Number(final.chambreId)), inArray(reservation.statut, STATUTS_ACTIFS)))
+  const debutFinal = String(final.dateDebut).length === 10 ? `${final.dateDebut}T15:00` : String(final.dateDebut).slice(0, 16)
+  const finFinal = String(final.dateFin).length === 10 ? `${final.dateFin}T11:00` : String(final.dateFin).slice(0, 16)
+  const conflit = conflits.some((r) => {
+    if (mode === 'update' && Number(r.id) === Number(id)) return false
+    const debutExistant = String(r.dateDebut).length === 10 ? `${r.dateDebut}T15:00` : String(r.dateDebut).slice(0, 16)
+    const finExistante = String(r.dateFin).length === 10 ? `${r.dateFin}T11:00` : String(r.dateFin).slice(0, 16)
+    return debutFinal < finExistante && finFinal > debutExistant
+  })
+  if (conflit) throw new ErreurMetier('Cette chambre est déjà réservée sur cette période.')
+  if (final.modeTarif !== undefined) data.modeTarif = final.modeTarif
+  if (final.tarifApplique !== undefined) data.tarifApplique = final.tarifApplique
+  if (final.regleArrondi !== undefined) data.regleArrondi = final.regleArrondi
+  return data
+}
+
+// ============================================================
+//  CAISSE
+//  Saisies à la main : service, don, renforcement, autre entrée / achat, dépense, retrait, autre sortie.
+//  Acomptes, paiements clients et remboursements sont écrits uniquement par les canaux
+//  « reservation:encaisser » et « reservation:annuler » (transaction).
+// ============================================================
+
+const ENTREES_MANUELLES = ['service', 'don', 'renforcement_patron', 'autre_entree']
+const SORTIES_MANUELLES = ['achat', 'depense', 'retrait', 'autre_sortie']
+
+// Solde = entrées − sorties, calculé en base. `executeur` : `db` ou une transaction.
+async function soldeCaisse(executeur = db) {
+  const [ligne] = await executeur
+    .select({
+      solde: sql`coalesce(sum(case when ${mouvementCaisse.type} = 'entree' then ${mouvementCaisse.montant} else -${mouvementCaisse.montant} end), 0)`
+    })
+    .from(mouvementCaisse)
+  return Number(ligne.solde)
+}
+
+async function verifierCaisse(data) {
+  const montant = Number(data.montant)
+  if (!Number.isInteger(montant) || montant <= 0) throw new ErreurMetier('Saisissez un montant supérieur à 0.')
+  data.montant = montant
+  data.motif = String(data.motif ?? '').trim()
+  if (!data.dateMouvement) data.dateMouvement = jourLocal()
+  if (data.modePaiement && !MODES_PAIEMENT.includes(data.modePaiement)) {
+    throw new ErreurMetier('Mode de paiement invalide.')
+  }
+
+  // Seule une sortie porte une pièce justificative : le nom doit être celui d'un fichier déjà copié
+  if (data.type !== 'sortie') {
+    data.pieceChemin = null
+  } else if (data.pieceChemin) {
+    const nom = basename(String(data.pieceChemin))
+    if (nom !== data.pieceChemin || !fs.existsSync(join(dossierPieces(), nom))) {
+      throw new ErreurMetier('Pièce justificative introuvable : joignez-la de nouveau.')
+    }
+  }
+
+  if (data.type === 'entree') {
+    if (!ENTREES_MANUELLES.includes(data.categorie)) throw new ErreurMetier("Origine de l'entrée invalide.")
+    if (data.categorie === 'service' && !data.serviceId) throw new ErreurMetier('Choisissez le service concerné.')
+  } else if (data.type === 'sortie') {
+    if (!SORTIES_MANUELLES.includes(data.categorie)) throw new ErreurMetier('Catégorie de sortie invalide.')
+    if (!data.motif) throw new ErreurMetier('Le motif est obligatoire pour une sortie de caisse.')
+    const solde = await soldeCaisse()
+    if (montant > solde) {
+      throw new ErreurMetier(`Solde de caisse insuffisant (${solde.toLocaleString('fr-FR')} XAF).`)
+    }
+  } else {
+    throw new ErreurMetier('Type de mouvement invalide.')
   }
   return data
 }
+
+// ---------- Pièces justificatives des sorties de caisse ----------
+// Le fichier choisi est COPIÉ dans le dossier de données de l'application : il reste disponible
+// même si l'original est déplacé. Seul le nom du fichier copié est enregistré en base.
+const dossierPieces = () => join(app.getPath('userData'), 'pieces')
+const TAILLE_MAX_PIECE = 10 * 1024 * 1024 // 10 Mo
+
+enregistrer('caisse:choisirPiece', async () => {
+  const choix = await dialog.showOpenDialog(mainWindow, {
+    title: 'Joindre une pièce justificative',
+    properties: ['openFile'],
+    filters: [{ name: 'Facture ou reçu', extensions: ['pdf', 'png', 'jpg', 'jpeg', 'webp'] }]
+  })
+  if (choix.canceled || choix.filePaths.length === 0) return null
+
+  const source = choix.filePaths[0]
+  if (fs.statSync(source).size > TAILLE_MAX_PIECE) {
+    throw new ErreurMetier('Ce fichier dépasse 10 Mo.')
+  }
+  await fs.promises.mkdir(dossierPieces(), { recursive: true })
+  const nom = `${Date.now()}-${randomBytes(4).toString('hex')}${extname(source).toLowerCase()}`
+  await fs.promises.copyFile(source, join(dossierPieces(), nom))
+  return { nom, original: basename(source) }
+})
+
+enregistrer('caisse:ouvrirPiece', async (nom) => {
+  const fichier = join(dossierPieces(), basename(String(nom ?? '')))
+  if (!fs.existsSync(fichier)) throw new ErreurMetier('Cette pièce est introuvable sur cet ordinateur.')
+  const erreur = await shell.openPath(fichier)
+  if (erreur) throw new ErreurMetier("Impossible d'ouvrir cette pièce.")
+  return { success: true }
+})
+
+// ---------- Apparence (thème) ----------
+// Mémorisé dans un petit fichier du dossier de données, relu à chaque démarrage.
+// `nativeTheme.themeSource` change aussi la valeur « prefers-color-scheme » vue par l'interface.
+const THEMES = ['system', 'light', 'dark']
+const fichierPreferences = () => join(app.getPath('userData'), 'preferences.json')
+
+function lirePreferences() {
+  try {
+    return JSON.parse(fs.readFileSync(fichierPreferences(), 'utf8'))
+  } catch {
+    return {}
+  }
+}
+
+enregistrer('apparence:obtenir', async () => nativeTheme.themeSource)
+
+enregistrer('apparence:definir', async (theme) => {
+  if (!THEMES.includes(theme)) throw new ErreurMetier('Thème invalide.')
+  nativeTheme.themeSource = theme
+  fs.writeFileSync(fichierPreferences(), JSON.stringify({ ...lirePreferences(), theme }))
+  return { theme }
+})
 
 // ============================================================
 //  CRUD : un seul enregistrement par table
 //  Le nom de la clé est le préfixe du canal IPC (ex. « clients:getAll »).
 //  Il doit rester identique à la liste TABLES du preload.
+//  `ajoutSeul` : lecture et création uniquement (journal non modifiable).
 // ============================================================
 
 const TABLES = {
   clients: { table: client },
   demande: { table: demande },
   reservation: { table: reservation, avantEcriture: verifierDisponibilite },
-  hotel: { table: hotel },
+  hotel: { table: hotel, avantEcriture: verifierHotel },
   utilisateur: { table: user, secrets: ['passwordHash'] },
   service: { table: service },
   consommation: { table: consommation },
   chambre: { table: chambre, avantEcriture: verifierTypeChambre },
-  typedechambre: { table: typeDeChambre },
-  facture: { table: facture }
+  typedechambre: { table: typeDeChambre, avantEcriture: verifierTarifsTypeChambre },
+  facture: { table: facture },
+  mouvementcaisse: { table: mouvementCaisse, avantEcriture: verifierCaisse, ajoutSeul: true }
 }
 
-for (const [canal, { table, avantEcriture, secrets = [] }] of Object.entries(TABLES)) {
+for (const [canal, { table, avantEcriture, secrets = [], ajoutSeul = false }] of Object.entries(TABLES)) {
   // Retire les colonnes secrètes avant de renvoyer une ligne à l'interface
   const masquer = (ligne) => {
     if (!ligne || secrets.length === 0) return ligne
@@ -473,6 +739,11 @@ for (const [canal, { table, avantEcriture, secrets = [] }] of Object.entries(TAB
       ...secrets
     ]
     const propre = filtrerChamps(table, data, interdits)
+    // L'auteur vient de la session, jamais de l'interface
+    if (mode === 'create' && 'createdBy' in getTableColumns(table)) {
+      if (!session) throw new ErreurMetier('Session expirée : reconnectez-vous.')
+      propre.createdBy = session.userId
+    }
     return avantEcriture ? ((await avantEcriture(propre, mode, id)) ?? propre) : propre
   }
 
@@ -489,6 +760,9 @@ for (const [canal, { table, avantEcriture, secrets = [] }] of Object.entries(TAB
     return masquer(lignes[0])
   })
 
+  // Le journal de caisse n'est jamais modifié ni supprimé : une erreur se corrige par une écriture inverse
+  if (ajoutSeul) continue
+
   enregistrer(`${canal}:update`, async (id, data) => {
     const valeurs = await preparer(data, 'update', id)
     if (Object.keys(valeurs).length === 0) throw new ErreurMetier('Aucune modification à enregistrer.')
@@ -502,6 +776,124 @@ for (const [canal, { table, avantEcriture, secrets = [] }] of Object.entries(TAB
     return { success: true }
   })
 }
+
+// ============================================================
+//  ENCAISSEMENT ET ANNULATION (une transaction chacun)
+// ============================================================
+
+// Un paiement avant l'arrivée est un acompte, ensuite c'est un règlement : la nature est choisie par l'interface
+// selon le statut de la réservation, et validée ici.
+enregistrer('reservation:encaisser', async (id, donnees) => {
+  const montant = Number(donnees?.montant)
+  const nature = donnees?.nature ?? 'paiement_client'
+  if (!session) throw new ErreurMetier('Session expirée : reconnectez-vous.')
+  if (!Number.isInteger(montant) || montant <= 0) throw new ErreurMetier('Saisissez un montant supérieur à 0.')
+  if (!MODES_PAIEMENT.includes(donnees?.mode)) throw new ErreurMetier('Choisissez le mode de paiement.')
+  if (!['acompte', 'paiement_client'].includes(nature)) throw new ErreurMetier('Nature de paiement invalide.')
+
+  const resultat = await db.transaction(async (tx) => {
+    const [r] = await tx.select().from(reservation).where(eq(reservation.id, Number(id)))
+    if (!r) throw new ErreurMetier('Réservation introuvable.')
+    if (r.statut === 'annulee') throw new ErreurMetier('Cette réservation est annulée.')
+    await tx.update(reservation).set({ montantPaye: r.montantPaye + montant }).where(eq(reservation.id, r.id))
+    await tx.insert(mouvementCaisse).values({
+      type: 'entree',
+      categorie: nature,
+      montant,
+      modePaiement: donnees.mode,
+      reservationId: r.id,
+      dateMouvement: jourLocal(),
+      createdBy: session.userId
+    })
+    return { success: true }
+  })
+  await db.run(sql`PRAGMA foreign_keys = ON`) // la transaction ouvre une nouvelle connexion
+  return resultat
+})
+
+// Annulation : l'acompte est remboursé (sortie de caisse) ou conservé, au choix de la réceptionniste
+enregistrer('reservation:annuler', async (id, options) => {
+  const rembourser = Boolean(options?.rembourser)
+  if (!session) throw new ErreurMetier('Session expirée : reconnectez-vous.')
+
+  const resultat = await db.transaction(async (tx) => {
+    const [r] = await tx.select().from(reservation).where(eq(reservation.id, Number(id)))
+    if (!r) throw new ErreurMetier('Réservation introuvable.')
+    if (!['confirmee', 'en_attente'].includes(r.statut)) {
+      throw new ErreurMetier('Seule une réservation non commencée peut être annulée.')
+    }
+    await tx
+      .update(reservation)
+      .set({ statut: 'annulee', ...(rembourser ? { montantPaye: 0 } : {}) })
+      .where(eq(reservation.id, r.id))
+    if (rembourser && r.montantPaye > 0) {
+      if (r.montantPaye > (await soldeCaisse(tx))) {
+        throw new ErreurMetier(`Solde de caisse insuffisant pour rembourser ${r.montantPaye.toLocaleString('fr-FR')} XAF.`)
+      }
+      await tx.insert(mouvementCaisse).values({
+        type: 'sortie',
+        categorie: 'remboursement_acompte',
+        montant: r.montantPaye,
+        reservationId: r.id,
+        motif: `Annulation de la réservation n°${r.id}`,
+        dateMouvement: jourLocal(),
+        createdBy: session.userId
+      })
+    }
+    return { success: true }
+  })
+  await db.run(sql`PRAGMA foreign_keys = ON`)
+  return resultat
+})
+
+// ============================================================
+//  ARRIVÉE ET DÉPART (réservation et chambre changent ensemble, ou pas du tout)
+// ============================================================
+
+const REFUS_ARRIVEE = {
+  occupee: 'Cette chambre est encore occupée par un autre séjour.',
+  nettoyage: 'Cette chambre est en cours de nettoyage.',
+  maintenance: 'Cette chambre est hors service.'
+}
+
+enregistrer('reservation:arrivee', async (id) => {
+  const resultat = await db.transaction(async (tx) => {
+    const [r] = await tx.select().from(reservation).where(eq(reservation.id, Number(id)))
+    if (!r) throw new ErreurMetier('Réservation introuvable.')
+    if (r.statut !== 'confirmee') throw new ErreurMetier("L'arrivée n'est possible que pour une réservation confirmée.")
+
+    const [ch] = await tx.select().from(chambre).where(eq(chambre.id, r.chambreId))
+    if (!ch) throw new ErreurMetier('Chambre introuvable.')
+    if (REFUS_ARRIVEE[ch.statut]) throw new ErreurMetier(REFUS_ARRIVEE[ch.statut])
+
+    await tx.update(reservation).set({ statut: 'en_sejour' }).where(eq(reservation.id, r.id))
+    await tx
+      .update(chambre)
+      .set({ statut: 'occupee', statutDepuis: new Date().toISOString() })
+      .where(eq(chambre.id, ch.id))
+    return { success: true, numeroChambre: ch.numero }
+  })
+  await db.run(sql`PRAGMA foreign_keys = ON`)
+  return resultat
+})
+
+// Un départ avec reste à payer est permis : la réservation s'affiche alors « Paiement en attente ».
+enregistrer('reservation:depart', async (id) => {
+  const resultat = await db.transaction(async (tx) => {
+    const [r] = await tx.select().from(reservation).where(eq(reservation.id, Number(id)))
+    if (!r) throw new ErreurMetier('Réservation introuvable.')
+    if (r.statut !== 'en_sejour') throw new ErreurMetier("Le départ n'est possible que pour un séjour en cours.")
+
+    await tx.update(reservation).set({ statut: 'terminee' }).where(eq(reservation.id, r.id))
+    await tx
+      .update(chambre)
+      .set({ statut: 'nettoyage', statutDepuis: new Date().toISOString() })
+      .where(eq(chambre.id, r.chambreId))
+    return { success: true }
+  })
+  await db.run(sql`PRAGMA foreign_keys = ON`)
+  return resultat
+})
 
 // ============================================================
 //  ACCÈS : création de l'hôtel et connexion (100 % locales)
@@ -672,38 +1064,17 @@ enregistrer('session:courante', async () => {
   return {
     utilisateur: utilisateurPublic(u),
     hotel: h
-      ? { id: h.id, name: h.name, ville: h.ville, heureArrivee: h.heureArrivee, heureDepart: h.heureDepart }
+      ? {
+          id: h.id,
+          name: h.name,
+          ville: h.ville,
+          heureArrivee: h.heureArrivee,
+          heureDepart: h.heureDepart,
+          margeNettoyageMinutes: h.margeNettoyageMinutes
+        }
       : null
   }
 })
-
-// En développement : crée un hôtel et un administrateur si la base est vide,
-// pour tester les réservations sans passer par la création de compte.
-// async function amorcerDev() {
-//   if (!is.dev) return
-//   const existants = await db.select({ id: hotel.id }).from(hotel)
-//   if (existants.length > 0) return
-//   const [h] = await db
-//     .insert(hotel)
-//     .values({
-//       name: 'Hôtel Le Céleste',
-//       adresse: 'Brazzaville',
-//       ville: 'Brazzaville',
-//       tel: '+242 00 000 00 00',
-//       email: 'contact@hotel.cg',
-//       nombreEtages: 3,
-//       nombreChambres: 0
-//     })
-//     .returning()
-//   await db.insert(user).values({
-//     hotelId: h.id,
-//     username: 'admin',
-//     email: 'admin@hotel.cg',
-//     firstName: 'Ebana',
-//     lastName: 'Plamedi',
-//     role: 'administrateur'
-//   })
-// }
 
 // ============================================================
 //  MISES À JOUR (GitHub Releases, dépôt « hypnos-update-history »)
@@ -811,6 +1182,10 @@ app.whenReady().then(() => {
 
   // Définit aussi l'identité de l'icône dans la barre des tâches (Windows)
   electronApp.setAppUserModelId('com.hypnos.app')
+
+  // Thème choisi dans les paramètres, appliqué avant l'ouverture de la première fenêtre
+  const themeEnregistre = lirePreferences().theme
+  if (THEMES.includes(themeEnregistre)) nativeTheme.themeSource = themeEnregistre
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

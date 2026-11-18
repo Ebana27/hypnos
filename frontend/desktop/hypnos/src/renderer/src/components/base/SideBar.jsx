@@ -16,14 +16,62 @@ import {
 } from 'lucide-react'
 
 const LIENS = [
-  { vers: '/', libelle: 'Accueil', description: 'Tableau de bord et indicateurs clés.', tuto: 'https://www.hypnos.space/tuto/module/#accueil', Icone: House },
-  { vers: '/booking', libelle: 'Réservations', description: 'Gestion des séjours et plannings.', tuto: 'https://www.hypnos.space/tuto/module/#booking', Icone: Calendar },
-  { vers: '/rooms', libelle: 'Chambres', description: 'État des chambres et attributions.', tuto: 'https://www.hypnos.space/tuto/module/#rooms', Icone: BedDouble },
-  { vers: '/clients', libelle: 'Clients', description: 'Fichiers clients et historiques.', tuto: 'https://www.hypnos.space/tuto/module/#clients', Icone: User },
-  { vers: '/communication', libelle: 'Communication', description: 'Messagerie et notifications clients.', tuto: 'https://www.hypnos.space/tuto/module/#communication', Icone: MessageSquare },
-  { vers: '/services', libelle: 'Services', description: 'Prestations et services additionnels.', tuto: 'https://www.hypnos.space/tuto/module/#services', Icone: ConciergeBell },
-  { vers: '/accounting', libelle: 'Comptabilité', description: 'Factures, paiements et encaissements.', tuto: 'https://www.hypnos.space/tuto/module/#accounting', Icone: Calculator },
-  { vers: '/rapports', libelle: 'Rapports', description: 'Statistiques et analyses de performance.', tuto: 'https://www.hypnos.space/tuto/module/#rapports', Icone: TrendingUp }
+  {
+    vers: '/',
+    libelle: 'Accueil',
+    description: 'Tableau de bord et indicateurs clés.',
+    tuto: 'https://hypnos-hypnos.vercel.app/guide/#accueil',
+    Icone: House
+  },
+  {
+    vers: '/booking',
+    libelle: 'Réservations',
+    description: 'Gestion des séjours et plannings.',
+    tuto: 'https://hypnos-hypnos.vercel.app/guide/#reservations',
+    Icone: Calendar
+  },
+  {
+    vers: '/rooms',
+    libelle: 'Chambres',
+    description: 'État des chambres et attributions.',
+    tuto: 'https://hypnos-hypnos.vercel.app/guide/#chambres',
+    Icone: BedDouble
+  },
+  {
+    vers: '/clients',
+    libelle: 'Clients',
+    description: 'Fichiers clients et historiques.',
+    tuto: 'https://hypnos-hypnos.vercel.app/guide/#clients',
+    Icone: User
+  },
+  {
+    vers: '/communication',
+    libelle: 'Communication',
+    description: 'Messages entrants et demandes de réservation.',
+    tuto: 'https://hypnos-hypnos.vercel.app/guide/#communication',
+    Icone: MessageSquare
+  },
+  {
+    vers: '/services',
+    libelle: 'Services',
+    description: 'Prestations et services additionnels.',
+    tuto: 'https://hypnos-hypnos.vercel.app/guide/#services',
+    Icone: ConciergeBell
+  },
+  {
+    vers: '/accounting',
+    libelle: 'Comptabilité',
+    description: 'Factures, paiements et encaissements.',
+    tuto: 'https://hypnos-hypnos.vercel.app/guide/#comptabilite',
+    Icone: Calculator
+  },
+  {
+    vers: '/rapports',
+    libelle: 'Rapports',
+    description: 'Statistiques et analyses de performance.',
+    tuto: 'https://hypnos-hypnos.vercel.app/guide/#rapports',
+    Icone: TrendingUp
+  }
 ]
 
 const NOM_HOTEL = 'Hôtel Le Céleste'
@@ -257,12 +305,13 @@ const STYLES = `
   top: 50%;
   transform: translateY(-50%);
   z-index: 100;
-  width: 220px;
-  padding: 12px 16px;
-  border-radius: 12px;
-  background: #0f172a;
-  color: #ffffff;
-  box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.25);
+  width: 232px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--color-shadow);
   pointer-events: auto;
   animation: fadeInTooltip 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -280,44 +329,47 @@ const STYLES = `
   transform: translateY(-50%);
   border-width: 6px;
   border-style: solid;
-  border-color: transparent #0f172a transparent transparent;
+  border-color: transparent var(--color-surface) transparent transparent;
 }
 
 .infobulle__titre {
   font-size: 13px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--color-text);
   line-height: 1.2;
 }
 
 .infobulle__separateur {
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
-  margin: 8px 0;
+  border-top: 1px solid var(--color-border);
+  margin: 10px 0;
 }
 
 .infobulle__desc {
-  font-size: 11px;
-  font-weight: 400;
-  color: #cbd5e1;
-  line-height: 1.4;
-  margin: 0 0 8px 0;
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-muted);
 }
 
 .infobulle__lien {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11px;
-  font-weight: 500;
-  color: #60a5fa;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--color-accent-wash);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-accent);
   text-decoration: none;
-  transition: color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .infobulle__lien:hover {
-  color: #93c5fd;
-  text-decoration: underline;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -398,8 +450,8 @@ export default function Sidebar() {
           {LIENS.map((item) => {
             const { vers, libelle, description, tuto, Icone } = item
             return (
-              <div 
-                key={vers} 
+              <div
+                key={vers}
                 className="sidebar__item-wrapper"
                 onMouseEnter={() => surEntreeSouris(item)}
                 onMouseLeave={surSortieSouris}
@@ -419,13 +471,8 @@ export default function Sidebar() {
                     <div className="infobulle__titre">{libelle}</div>
                     <hr className="infobulle__separateur" />
                     <p className="infobulle__desc">{description}</p>
-                    <a 
-                      href={tuto} 
-                      target="_blank" 
-                      rel="noreferrer" 
-                      className="infobulle__lien"
-                    >
-                      <span>Guide & Tutoriel</span>
+                    <a href={tuto} target="_blank" rel="noreferrer" className="infobulle__lien">
+                      <span>Guide utilisateur</span>
                       <ArrowUpRight size={13} />
                     </a>
                   </div>

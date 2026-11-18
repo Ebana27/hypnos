@@ -12,7 +12,8 @@ const TABLES = [
   'consommation',
   'chambre',
   'typedechambre',
-  'facture'
+  'facture',
+  'mouvementcaisse'
 ]
 
 function verifierTable(table) {
@@ -84,6 +85,24 @@ const api = {
   remove: async (table, id) => {
     verifierTable(table)
     return appeler(`${table}:delete`, id)
+  },
+
+  // -------- Actions métier (transaction côté serveur) --------
+  encaisser: (id, donnees) => appeler('reservation:encaisser', id, donnees),
+  annuler: (id, options) => appeler('reservation:annuler', id, options),
+  arrivee: (id) => appeler('reservation:arrivee', id),
+  depart: (id) => appeler('reservation:depart', id),
+
+  // -------- Apparence : 'system' | 'light' | 'dark' --------
+  apparence: {
+    obtenir: () => appeler('apparence:obtenir'),
+    definir: (theme) => appeler('apparence:definir', theme)
+  },
+
+  // -------- Pièces justificatives de la caisse --------
+  caisse: {
+    choisirPiece: () => appeler('caisse:choisirPiece'),
+    ouvrirPiece: (nom) => appeler('caisse:ouvrirPiece', nom)
   },
 
   // -------- Anciens noms (à supprimer quand les pages utiliseront le CRUD générique) --------

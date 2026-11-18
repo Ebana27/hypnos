@@ -6,6 +6,7 @@ import FailToast from '../components/base/FailToast'
 import FilterPillule from '../components/base/FilterPillule'
 import Header from '../components/base/Header'
 import Input from '../components/base/Input'
+import InputSearch from '../components/base/InputSearch'
 import Modal from '../components/base/Modal'
 import SuccessToast from '../components/base/SuccessToast'
 import injecterStyles from '../components/base/injecterStyles'
@@ -13,11 +14,18 @@ import { STATUTS_RESERVATION, formatCourt, jourDe } from '../lib/reservations'
 
 const FORMULAIRE_VIDE = { nom: '', prenom: '', tel: '', email: '', sexe: 'M' }
 
+const TRIS = [
+  { valeur: 'az', libelle: 'Nom A → Z' },
+  { valeur: 'za', libelle: 'Nom Z → A' },
+  { valeur: 'recent', libelle: 'Séjour le plus récent' },
+  { valeur: 'sejours', libelle: 'Plus de réservations' }
+]
+
 const STYLES = `
 .clients-page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
   min-width: 0;
 }
 .clients__resume {
@@ -46,19 +54,20 @@ const STYLES = `
 .clients__outils {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: flex-end;
+  gap: 12px 16px;
 }
-.clients__recherche {
-  flex: 1 1 260px;
-  max-width: 420px;
-}
+.clients__recherche { flex: 1 1 260px; max-width: 420px; }
+.clients__tri { flex: 0 0 210px; }
 .clients__filtres {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
+.clients__filtres-groupe { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.clients__filtres-titre { color: var(--color-text-muted); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.clients__compteur { color: var(--color-text-muted); font-size: 12px; }
 .clients__liste {
   overflow: hidden;
   border: 1px solid var(--color-border);
@@ -87,6 +96,15 @@ const STYLES = `
 }
 .clients__ligne--donnee { cursor: pointer; font: inherit; }
 .clients__ligne--donnee:hover { background: var(--color-accent-wash); }
+.clients__lettre {
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-background-soft);
+  color: var(--color-accent);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+}
 .clients__identite { display: flex; align-items: center; gap: 11px; min-width: 0; }
 .clients__avatar {
   display: grid;
@@ -100,8 +118,16 @@ const STYLES = `
   font-size: 12px;
   font-weight: 700;
 }
-.clients__nom { overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.clients__sous-nom { color: var(--color-text-muted); font-size: 11px; }
+.clients__nom { display: block; overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.clients__sous-nom { display: flex; flex-wrap: wrap; gap: 6px; color: var(--color-text-muted); font-size: 11px; }
+.clients__etiquette {
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-wash);
+  color: var(--color-accent);
+  font-size: 10px;
+  font-weight: 700;
+}
 .clients__contact { display: flex; align-items: center; gap: 7px; min-width: 0; color: var(--color-text-muted); font-size: 12px; }
 .clients__contact span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .clients__sejours { font-size: 12px; font-weight: 600; }
@@ -122,12 +148,14 @@ const STYLES = `
 .clients__badge { align-self: center; padding: 3px 9px; border-radius: var(--radius-pill); background: var(--color-background-soft); color: var(--color-text-muted); font-size: 10px; font-weight: 600; }
 .clients__detail-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .clients__detail-contact { display: flex; flex-wrap: wrap; gap: 14px; color: var(--color-text-muted); font-size: 13px; }
+.clients__form { display: grid; gap: 12px; }
 @media (max-width: 900px) {
   .clients__ligne { grid-template-columns: minmax(180px, 1.5fr) minmax(130px, 1fr) 90px; }
   .clients__ligne > :nth-child(4), .clients__ligne > :nth-child(5) { display: none; }
 }
 @media (max-width: 620px) {
   .clients__resume { grid-template-columns: 1fr; }
+  .clients__recherche, .clients__tri { flex: 1 1 100%; max-width: none; }
   .clients__ligne { grid-template-columns: minmax(0, 1fr) 82px; gap: 8px; }
   .clients__ligne > :nth-child(2), .clients__ligne > :nth-child(3), .clients__ligne > :nth-child(5) { display: none; }
 }
@@ -135,9 +163,19 @@ const STYLES = `
 
 injecterStyles('hypnos-page-clients', STYLES)
 
-const texteNormalise = (valeur) => String(valeur ?? '').trim().toLocaleLowerCase('fr')
+// Recherche et tri insensibles aux accents et à la casse : « Élodie » se trouve avec « elodie »
+const normaliser = (valeur) =>
+  String(valeur ?? '').trim().toLocaleLowerCase('fr').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+const chiffres = (valeur) => String(valeur ?? '').replace(/\D/g, '')
 const initiales = (client) => `${client.prenom?.[0] ?? ''}${client.nom?.[0] ?? ''}`.toLocaleUpperCase('fr') || '?'
 const libelleClient = (client) => `${client.sexe === 'F' ? 'Mme' : 'M.'} ${client.prenom ?? ''} ${client.nom ?? ''}`.trim()
+const estFemme = (client) => client.sexe === 'F'
+const comparerNom = (a, b) =>
+  `${a.nom ?? ''} ${a.prenom ?? ''}`.localeCompare(`${b.nom ?? ''} ${b.prenom ?? ''}`, 'fr', { sensitivity: 'base' })
+const lettreDe = (client) => {
+  const l = normaliser(client.nom).charAt(0).toLocaleUpperCase('fr')
+  return /[A-Z]/.test(l) ? l : '#'
+}
 
 function dateAffichee(texte) {
   if (!texte) return '—'
@@ -149,7 +187,9 @@ export default function ClientPage() {
   const [clients, setClients] = useState([])
   const [reservations, setReservations] = useState([])
   const [recherche, setRecherche] = useState('')
-  const [filtre, setFiltre] = useState('tous')
+  const [filtre, setFiltre] = useState('tous') // réservations : 'tous' | 'avec-sejour' | 'sans-sejour'
+  const [filtreSexe, setFiltreSexe] = useState('tous') // 'tous' | 'M' | 'F'
+  const [tri, setTri] = useState('az')
   const [clientActif, setClientActif] = useState(null)
   const [clientEnEdition, setClientEnEdition] = useState(null)
   const [form, setForm] = useState(FORMULAIRE_VIDE)
@@ -187,22 +227,41 @@ export default function ClientPage() {
   }, [reservations])
 
   const clientsFiltres = useMemo(() => {
-    const q = texteNormalise(recherche)
-    return [...clients]
-      .filter((client) => {
-        const historique = reservationsParClient.get(client.id) ?? []
-        const aSejour = historique.length > 0
-        const correspondFiltre = filtre === 'tous' || (filtre === 'avec-sejour' ? aSejour : !aSejour)
-        const cible = [client.nom, client.prenom, client.tel, client.email].map(texteNormalise).join(' ')
-        return correspondFiltre && (!q || cible.includes(q))
-      })
-      .sort((a, b) => `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`, 'fr'))
-  }, [clients, recherche, filtre, reservationsParClient])
+    const q = normaliser(recherche)
+    const qChiffres = chiffres(recherche)
+    const liste = clients.filter((client) => {
+      const aSejour = (reservationsParClient.get(client.id) ?? []).length > 0
+      const correspondSejour = filtre === 'tous' || (filtre === 'avec-sejour' ? aSejour : !aSejour)
+      const correspondSexe = filtreSexe === 'tous' || (filtreSexe === 'F' ? estFemme(client) : !estFemme(client))
+      const cible = [client.nom, client.prenom, client.tel, client.email].map(normaliser).join(' ')
+      // Un numéro se retrouve même saisi avec d'autres espaces : « 06 123 » trouve « +242 06123… »
+      const correspondRecherche = !q || cible.includes(q) || (qChiffres.length >= 3 && chiffres(client.tel).includes(qChiffres))
+      return correspondSejour && correspondSexe && correspondRecherche
+    })
+    const dernier = (client) => String((reservationsParClient.get(client.id) ?? [])[0]?.dateDebut ?? '')
+    const nombre = (client) => (reservationsParClient.get(client.id) ?? []).length
+    return liste.sort((a, b) => {
+      if (tri === 'za') return comparerNom(b, a)
+      if (tri === 'recent') return dernier(b).localeCompare(dernier(a)) || comparerNom(a, b)
+      if (tri === 'sejours') return nombre(b) - nombre(a) || comparerNom(a, b)
+      return comparerNom(a, b)
+    })
+  }, [clients, recherche, filtre, filtreSexe, tri, reservationsParClient])
 
   const avecSejour = useMemo(
     () => clients.filter((client) => (reservationsParClient.get(client.id) ?? []).length > 0).length,
     [clients, reservationsParClient]
   )
+  const nbFemmes = useMemo(() => clients.filter(estFemme).length, [clients])
+  const nbHommes = clients.length - nbFemmes
+  const regrouper = tri === 'az' || tri === 'za'
+  const filtresActifs = filtre !== 'tous' || filtreSexe !== 'tous' || recherche.trim() !== ''
+
+  function reinitialiserFiltres() {
+    setFiltre('tous')
+    setFiltreSexe('tous')
+    setRecherche('')
+  }
 
   function ouvrirCreation() {
     setClientEnEdition(null)
@@ -224,20 +283,37 @@ export default function ClientPage() {
 
   async function enregistrerClient(e) {
     e?.preventDefault?.()
-    if (!form.nom.trim() || !form.prenom.trim()) {
+    const donnees = {
+      nom: form.nom.trim(),
+      prenom: form.prenom.trim(),
+      tel: form.tel.trim(),
+      email: form.email.trim(),
+      sexe: form.sexe
+    }
+    if (!donnees.nom || !donnees.prenom) {
       setErreur('Le prénom et le nom du client sont obligatoires.')
+      return
+    }
+    if (donnees.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(donnees.email)) {
+      setErreur('L’adresse e-mail ne semble pas valide.')
+      return
+    }
+    if (donnees.tel && chiffres(donnees.tel).length < 6) {
+      setErreur('Le numéro de téléphone semble incomplet.')
+      return
+    }
+    // Évite les doublons : même téléphone ou même e-mail qu'un autre client
+    const doublon = clients.find((c) => c.id !== clientEnEdition?.id && (
+      (donnees.tel && chiffres(c.tel) === chiffres(donnees.tel)) ||
+      (donnees.email && normaliser(c.email) === normaliser(donnees.email))
+    ))
+    if (doublon) {
+      setErreur(`Ce téléphone ou cet e-mail appartient déjà à ${libelleClient(doublon)}.`)
       return
     }
     setChargement(true)
     setErreur('')
     try {
-      const donnees = {
-        nom: form.nom.trim(),
-        prenom: form.prenom.trim(),
-        tel: form.tel.trim(),
-        email: form.email.trim(),
-        sexe: form.sexe
-      }
       if (clientEnEdition) {
         await window.electronAPI.update('clients', clientEnEdition.id, donnees)
         setSucces('Les coordonnées du client ont été mises à jour.')
@@ -245,6 +321,7 @@ export default function ClientPage() {
         await window.electronAPI.create('clients', donnees)
         setSucces('Le client a été ajouté.')
       }
+      window.dispatchEvent(new Event('hypnos:donnees-mises-a-jour'))
       setClientActif(null)
       setClientEnEdition(null)
       await charger()
@@ -258,6 +335,8 @@ export default function ClientPage() {
   const historiqueActif = clientActif?.mode === 'detail'
     ? reservationsParClient.get(clientActif.client.id) ?? []
     : []
+
+  let lettreCourante = null
 
   return (
     <div className="clients-page">
@@ -282,50 +361,74 @@ export default function ClientPage() {
 
       <div className="clients__outils">
         <div className="clients__recherche">
-          <Input
-            label="Rechercher un client"
-            placeholder="Nom, prénom, téléphone ou e-mail"
+          <InputSearch
             value={recherche}
-            onChange={(e) => setRecherche(e.target.value)}
+            onChange={setRecherche}
+            placeholder="Nom, prénom, téléphone ou e-mail"
           />
         </div>
-        <div className="clients__filtres" aria-label="Filtrer les clients">
-          <FilterPillule libelle="Tous" compteur={clients.length} actif={filtre === 'tous'} onClick={() => setFiltre('tous')} />
+        <div className="clients__tri">
+          <Input label="Trier par" value={tri} onChange={(e) => setTri(e.target.value)} options={TRIS} />
+        </div>
+      </div>
+
+      <div className="clients__filtres">
+        <div className="clients__filtres-groupe" role="group" aria-label="Filtrer par civilité">
+          <span className="clients__filtres-titre">Civilité</span>
+          <FilterPillule libelle="Tous" compteur={clients.length} actif={filtreSexe === 'tous'} onClick={() => setFiltreSexe('tous')} />
+          <FilterPillule libelle="Hommes" compteur={nbHommes} actif={filtreSexe === 'M'} onClick={() => setFiltreSexe(filtreSexe === 'M' ? 'tous' : 'M')} />
+          <FilterPillule libelle="Femmes" compteur={nbFemmes} actif={filtreSexe === 'F'} onClick={() => setFiltreSexe(filtreSexe === 'F' ? 'tous' : 'F')} />
+        </div>
+        <div className="clients__filtres-groupe" role="group" aria-label="Filtrer par réservations">
+          <span className="clients__filtres-titre">Séjours</span>
           <FilterPillule libelle="Avec réservation" compteur={avecSejour} actif={filtre === 'avec-sejour'} onClick={() => setFiltre(filtre === 'avec-sejour' ? 'tous' : 'avec-sejour')} />
           <FilterPillule libelle="Sans réservation" compteur={clients.length - avecSejour} actif={filtre === 'sans-sejour'} onClick={() => setFiltre(filtre === 'sans-sejour' ? 'tous' : 'sans-sejour')} />
         </div>
+        {filtresActifs && (
+          <Button variante="lien" taille="s" onClick={reinitialiserFiltres}>Réinitialiser</Button>
+        )}
+        <span className="clients__compteur" aria-live="polite">{clientsFiltres.length} client(s) affiché(s)</span>
       </div>
 
       <section className="clients__liste" aria-label="Liste des clients">
         <div className="clients__ligne clients__ligne--entete" aria-hidden="true">
-          <span>Client</span><span>Téléphone</span><span>E-mail</span><span>Réservations</span><span>Début le</span>
+          <span>Client</span><span>Téléphone</span><span>E-mail</span><span>Réservations</span><span>Dernier séjour</span>
         </div>
         {clientsFiltres.length ? clientsFiltres.map((client) => {
           const sejours = reservationsParClient.get(client.id) ?? []
           const derniere = sejours[0]
+          const lettre = regrouper ? lettreDe(client) : null
+          const enteteLettre = regrouper && lettre !== lettreCourante
+          lettreCourante = lettre
           return (
-            <button
-              type="button"
-              className="clients__ligne clients__ligne--donnee"
-              key={client.id}
-              onClick={() => setClientActif({ mode: 'detail', client })}
-            >
-              <span className="clients__identite">
-                <span className="clients__avatar" aria-hidden="true">{initiales(client)}</span>
-                <span>
-                  <span className="clients__nom">{libelleClient(client)}</span>
-                  <span className="clients__sous-nom">Fiche client</span>
+            <div key={client.id}>
+              {enteteLettre && <div className="clients__lettre" aria-hidden="true">{lettre}</div>}
+              <button
+                type="button"
+                className="clients__ligne clients__ligne--donnee"
+                onClick={() => setClientActif({ mode: 'detail', client })}
+              >
+                <span className="clients__identite">
+                  <span className="clients__avatar" aria-hidden="true">{initiales(client)}</span>
+                  <span>
+                    <span className="clients__nom">{libelleClient(client)}</span>
+                    <span className="clients__sous-nom">
+                      Fiche client
+                      {client.vip && <span className="clients__etiquette">VIP</span>}
+                      {client.loyalty && <span className="clients__etiquette">Fidèle</span>}
+                    </span>
+                  </span>
                 </span>
-              </span>
-              <span className="clients__contact"><Phone size={14} aria-hidden="true" /><span>{client.tel || 'Non renseigné'}</span></span>
-              <span className="clients__contact"><Mail size={14} aria-hidden="true" /><span>{client.email || 'Non renseigné'}</span></span>
-              <span className="clients__sejours">{sejours.length}</span>
-              <span className="clients__dernier">{derniere ? dateAffichee(derniere.dateDebut) : 'Aucun séjour'}</span>
-            </button>
+                <span className="clients__contact"><Phone size={14} aria-hidden="true" /><span>{client.tel || 'Non renseigné'}</span></span>
+                <span className="clients__contact"><Mail size={14} aria-hidden="true" /><span>{client.email || 'Non renseigné'}</span></span>
+                <span className="clients__sejours">{sejours.length}</span>
+                <span className="clients__dernier">{derniere ? dateAffichee(derniere.dateDebut) : 'Aucun séjour'}</span>
+              </button>
+            </div>
           )
         }) : (
           <p className="clients__vide">
-            {clients.length === 0 ? 'Aucun client enregistré. Ajoutez votre premier client.' : 'Aucun résultat pour cette recherche ou ce filtre.'}
+            {clients.length === 0 ? 'Aucun client enregistré. Ajoutez votre premier client.' : 'Aucun résultat pour cette recherche ou ces filtres.'}
           </p>
         )}
       </section>
@@ -340,11 +443,13 @@ export default function ClientPage() {
           onValider={enregistrerClient}
           chargement={chargement}
         >
-          <Input label="Nom" requis autoFocus value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })} />
-          <Input label="Prénom" requis value={form.prenom} onChange={(e) => setForm({ ...form, prenom: e.target.value })} />
-          <Input label="Téléphone" type="tel" placeholder="Ex. +242 06 …" value={form.tel} onChange={(e) => setForm({ ...form, tel: e.target.value })} />
-          <Input label="Adresse e-mail" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          <Input label="Civilité" value={form.sexe} onChange={(e) => setForm({ ...form, sexe: e.target.value })} options={[{ valeur: 'M', libelle: 'M.' }, { valeur: 'F', libelle: 'Mme' }]} />
+          <div className="clients__form">
+            <Input label="Nom" requis autoFocus value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })} />
+            <Input label="Prénom" requis value={form.prenom} onChange={(e) => setForm({ ...form, prenom: e.target.value })} />
+            <Input label="Téléphone" type="tel" placeholder="Ex. +242 06 …" value={form.tel} onChange={(e) => setForm({ ...form, tel: e.target.value })} />
+            <Input label="Adresse e-mail" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            <Input label="Civilité" value={form.sexe} onChange={(e) => setForm({ ...form, sexe: e.target.value })} options={[{ valeur: 'M', libelle: 'M.' }, { valeur: 'F', libelle: 'Mme' }]} />
+          </div>
         </Modal>
       )}
 
@@ -357,7 +462,17 @@ export default function ClientPage() {
           pied={
             <div className="clients__detail-actions">
               <Button variante="secondaire" icone={Pencil} onClick={() => ouvrirEdition(clientActif.client)}>Modifier la fiche</Button>
-              <Button icone={Plus} onClick={() => { setClientActif(null); navigate('/booking') }}>Nouvelle réservation</Button>
+              <Button
+                icone={Plus}
+                onClick={() => {
+                  const id = clientActif.client.id
+                  setClientActif(null)
+                  // La réservation s'ouvre avec ce client déjà choisi
+                  navigate('/booking', { state: { nouvelle: true, clientId: id } })
+                }}
+              >
+                Nouvelle réservation
+              </Button>
             </div>
           }
         >
