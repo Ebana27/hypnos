@@ -15,6 +15,8 @@ import {
 } from 'lucide-react'
 import BookingTimeline from '../components/BookingTimeline'
 import MethodesPaiement from '../components/MethodesPaiement'
+import logotype from '../assets/images/logotype.png'
+import { enregistrerFacture, genererFacturePdf } from '../lib/Facturepdf'
 import Button from '../components/base/Button'
 import FailToast from '../components/base/FailToast'
 import FilterPillule from '../components/base/FilterPillule'
@@ -508,6 +510,9 @@ const STYLES = `
 .facture__actions { display:flex; gap:6px; flex-wrap:wrap; }
 #facture-imprimable { display:grid; gap:8px; padding:12px; border:1px solid var(--color-border); border-radius:var(--radius-s); }
 #facture-imprimable > strong { font-size:13px; }
+.facture__entete { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+.facture__entete strong { font-size:13px; }
+.facture__logo { display:block; height:26px; width:auto; }
 #facture-imprimable > p { margin:0; font-size:12px; color:var(--color-text-muted); }
 @media print { body * { visibility:hidden !important; } #facture-imprimable, #facture-imprimable * { visibility:visible !important; } #facture-imprimable { position:fixed; inset:0 auto auto 0; width:100%; padding:24px; border:0; color:#111; background:#fff; } .facture__actions, .modal__pied, .fiche__encaisser { display:none !important; } }
 @media (max-width: 900px) { .resa-new { grid-template-columns:minmax(0,1fr) minmax(0,1fr); } }
@@ -642,7 +647,7 @@ const formulaireInitial = (prefill = {}) => {
   const finRaw = prefill.fin ?? (typeSejour === 'heure' ? `${debut.slice(0, 10)}T16:00` : cleJour(ajouterJours(jourDe(debut), 1)))
   const fin = dateHeureLocale(finRaw, typeSejour === 'heure' ? '16:00' : '11:00')
   return {
-    clientId: '', nom: '', prenom: '', tel: '', email: '', sexe: 'M', document: '',
+    clientId: prefill.clientId ? String(prefill.clientId) : '', nom: '', prenom: '', tel: '', email: '', sexe: 'M', document: '',
     preference: '', allergies: '', infoGenerales: '', vip: false, loyalty: false,
     chambreId: prefill.chambreId ? String(prefill.chambreId) : '', debut, fin,
     personnes: '1', adultes: '1', enfants: '0', typeGroupe: 'seul',
@@ -1007,19 +1012,18 @@ function ModaleNouvelle({ prefill, modele, chargement, onFermer, onCreer, onErre
 //    3. Paiement  : facture, encaisser, partager
 // ============================================================
 
-function partagerFacture(canal, resa) {
+// Ouvre le canal choisi avec un message d'accompagnement. Le PDF est généré et enregistré juste avant
+// (un lien mailto: ou wa.me ne peut pas joindre de fichier : l'utilisateur l'ajoute depuis le dossier de téléchargement).
+function ouvrirCanal(canal, resa) {
   const numero = String(resa.client?.tel ?? '').replace(/[^0-9+]/g, '')
   const adresse = String(resa.client?.email ?? '')
   const periode = `${formatCourt(jourDe(resa.dateDebut))} ${heureDe(resa.dateDebut, '15:00')} – ${formatCourt(jourDe(resa.dateFin))} ${heureDe(resa.dateFin, '11:00')}`
-  const services = resa.consos.length
-    ? ` Services : ${resa.consos.map((c) => `${c.serviceNom} ${formatArgent(c.montant)}`).join(', ')}.`
-    : ''
-  const texte = `Hypnos — récapitulatif provisoire de réservation n°${resa.id}. Client : ${resa.clientNom}. Chambre ${resa.numeroChambre}. Séjour : ${periode}.${services} Total indicatif : ${formatArgent(resa.total)} ${DEVISE}. Reste à payer : ${formatArgent(Math.max(resa.reste, 0))} ${DEVISE}. Taxes/mentions à valider.`
+  const texte = `Bonjour ${resa.clientNom}, veuillez trouver ci-joint votre facture provisoire n°${resa.id} (chambre ${resa.numeroChambre}, séjour ${periode}). Total : ${formatArgent(resa.total)} ${DEVISE}. Reste à payer : ${formatArgent(Math.max(resa.reste, 0))} ${DEVISE}. Merci de votre confiance. — Hypnos`
   const body = encodeURIComponent(texte)
   const url = canal === 'whatsapp'
     ? `https://wa.me/${numero.replace(/\D/g, '')}?text=${body}`
     : canal === 'email'
-      ? `mailto:${encodeURIComponent(adresse)}?subject=${encodeURIComponent(`Récapitulatif réservation ${resa.id}`)}&body=${body}`
+      ? `mailto:${encodeURIComponent(adresse)}?subject=${encodeURIComponent(`Votre facture - réservation n°${resa.id}`)}&body=${body}`
       : `sms:${encodeURIComponent(numero)}?body=${body}`
   window.open(url, '_blank', 'noopener')
 }
@@ -1035,7 +1039,9 @@ function ModaleDetail({
   onAjouterConso,
   onRetirerConso,
   onEncaisser,
-  onChangerStatut
+  onChangerStatut,
+  onFacture,
+  facturationEnCours
 }) {
   const [form, setForm] = useState({})
   const [montant, setMontant] = useState('')
@@ -1312,7 +1318,10 @@ function ModaleDetail({
             <h3 className="fiche__titre">Paiement</h3>
 
             <div id="facture-imprimable">
-              <strong>Facture provisoire · Réservation n°{resa.id}</strong>
+              <div className="facture__entete">
+                <img className="facture__logo" src={logotype} alt="Hypnos" />
+                <strong>Facture provisoire · Réservation n°{resa.id}</strong>
+              </div>
               <p>{nomComplet} · Chambre {resa.numeroChambre} · {periodeCourte(resa.dateDebut, resa.dateFin).replace('→', '–')}</p>
               <dl className="fiche__lignes">
                 <div>
@@ -1389,10 +1398,11 @@ function ModaleDetail({
               </div>
             )}
 
-            <div className="facture__actions" aria-label="Partager ou imprimer le récapitulatif">
-              <Button variante="secondaire" taille="s" onClick={() => partagerFacture('whatsapp', resa)}>WhatsApp</Button>
-              <Button variante="secondaire" taille="s" onClick={() => partagerFacture('email', resa)}>E-mail</Button>
-              <Button variante="secondaire" taille="s" onClick={() => partagerFacture('sms', resa)}>SMS</Button>
+            <div className="facture__actions" aria-label="Facture : télécharger, envoyer ou imprimer">
+              <Button variante="secondaire" taille="s" disabled={facturationEnCours} chargement={facturationEnCours} onClick={() => onFacture(null)}>Télécharger le PDF</Button>
+              <Button variante="secondaire" taille="s" disabled={facturationEnCours} onClick={() => onFacture('email')}>Envoyer par e-mail</Button>
+              <Button variante="secondaire" taille="s" disabled={facturationEnCours} onClick={() => onFacture('whatsapp')}>WhatsApp</Button>
+              <Button variante="secondaire" taille="s" onClick={() => onFacture('sms')}>SMS</Button>
               <Button variante="secondaire" taille="s" onClick={() => window.print()}>Imprimer</Button>
             </div>
           </section>
@@ -1472,13 +1482,45 @@ export default function BookingPage({ vueInitiale = 'liste', pleinEcran: pleinEc
   const [recherche, setRecherche] = useState(location.state?.recherche ?? '')
   const [filtre, setFiltre] = useState(location.state?.filtre ?? null)
 
-  const [nouvelle, setNouvelle] = useState(location.state?.nouvelle ? {} : null) // préremplissage de la fenêtre de création
+  const [nouvelle, setNouvelle] = useState(location.state?.nouvelle ? { clientId: location.state.clientId } : null) // préremplissage de la fenêtre de création
   const [selectionId, setSelectionId] = useState(null)
   const [deplacement, setDeplacement] = useState(null) // { id, candidat }
 
   const [chargement, setChargement] = useState(false)
   const [succes, setSucces] = useState('')
   const [echec, setEchec] = useState('')
+
+  // Coordonnées de l'hôtel (en-tête de la facture PDF)
+  const [hotel, setHotel] = useState(null)
+  const [facturationEnCours, setFacturationEnCours] = useState(false)
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const session = await window.electronAPI.sessionCourante?.()
+        setHotel(session?.hotel ?? null)
+      } catch { /* l'en-tête de la facture utilisera des valeurs par défaut */ }
+    })()
+  }, [])
+
+  // Génère le PDF, l'enregistre, puis ouvre (si demandé) le canal d'envoi
+  async function facturer(resa, canal) {
+    if (canal === 'sms') return ouvrirCanal('sms', resa)
+    setFacturationEnCours(true)
+    try {
+      const { blob, nomFichier } = await genererFacturePdf(resa, { hotel })
+      await enregistrerFacture(blob, nomFichier)
+      if (canal) {
+        ouvrirCanal(canal, resa)
+        setSucces(`Facture PDF enregistrée (${nomFichier}). Joignez-la au message qui vient de s’ouvrir.`)
+      } else {
+        setSucces(`Facture PDF enregistrée : ${nomFichier}.`)
+      }
+    } catch (e) {
+      setEchec(`Impossible de générer le PDF : ${e.message}`)
+    } finally {
+      setFacturationEnCours(false)
+    }
+  }
 
   // Recherche lancée depuis la barre supérieure alors que cette page est déjà ouverte
   useEffect(() => {
@@ -1836,7 +1878,7 @@ export default function BookingPage({ vueInitiale = 'liste', pleinEcran: pleinEc
           reservations={modele.resas}
           onOuvrir={setSelectionId}
           onDeplacer={(id, candidat) => setDeplacement({ id, candidat })}
-          onCreer={(c) => setNouvelle({ chambreId: c.chambreId, debut: c.debut, fin: c.fin })}
+          onCreer={(c) => setNouvelle({ chambreId: c.chambreId, debut: c.debut, fin: c.fin, typeSejour: c.typeSejour })}
           onRefus={setEchec}
         />
       )}
@@ -1865,6 +1907,8 @@ export default function BookingPage({ vueInitiale = 'liste', pleinEcran: pleinEc
           onRetirerConso={retirerConso}
           onEncaisser={(montant, mode) => encaisser(resaSelectionnee, montant, mode)}
           onChangerStatut={(action, options) => changerStatut(resaSelectionnee, action, options)}
+          onFacture={(canal) => facturer(resaSelectionnee, canal)}
+          facturationEnCours={facturationEnCours}
         />
       )}
 

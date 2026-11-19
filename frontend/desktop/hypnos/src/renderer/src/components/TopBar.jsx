@@ -93,6 +93,7 @@ export default function Topbar() {
     notifications.push({
       id: `nettoyage-${chambre.id}`,
       vers: '/rooms',
+      etat: { filtre: 'nettoyage' },
       urgente: minutes !== null && minutes >= attente,
       titre: `Chambre ${chambre.numero} en nettoyage`,
       detail: minutes === null ? 'À traiter : la chambre est marquée en nettoyage.' : `Depuis ${minutes} min${minutes >= attente ? ' — délai prévu dépassé, vérifier le ménage.' : '.'}`
@@ -161,7 +162,7 @@ export default function Topbar() {
           {ouvert && <section className="topbar__notifications" id="panneau-notifications" role="dialog" aria-label="Notifications">
             <div className="topbar__notifications-entete"><h2 className="topbar__notifications-titre">Notifications</h2><button type="button" className="topbar__notifications-fermer" aria-label="Fermer les notifications" onClick={() => setOuvert(false)}><X size={16} /></button></div>
             {notifications.length
-              ? <ul className="topbar__notifications-liste">{notifications.map((n) => <li key={n.id}><button type="button" className={`topbar__notification${n.urgente ? ' topbar__notification--alerte' : ''}`} onClick={() => { setOuvert(false); navigate(n.vers) }}><strong>{n.titre}</strong>{n.detail}</button></li>)}</ul>
+              ? <ul className="topbar__notifications-liste">{notifications.map((n) => <li key={n.id}><button type="button" className={`topbar__notification${n.urgente ? ' topbar__notification--alerte' : ''}`} onClick={() => { setOuvert(false); navigate(n.vers, n.etat ? { state: n.etat } : undefined) }}><strong>{n.titre}</strong>{n.detail}</button></li>)}</ul>
               : <div className="topbar__notifications-vide"><strong>Aucune notification pour le moment</strong><p>Les alertes de nettoyage et de disponibilité apparaîtront ici.</p></div>}
           </section>}
         </div>
