@@ -26,6 +26,7 @@ const STYLES = `
 .param__theme strong { font-size:13px; font-weight:600; }
 .param__theme span { color:var(--color-text-muted); font-size:11px; }
 .param__grille { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.param__choix-fin { max-width:360px; }
 .param__pied { display:flex; justify-content:flex-end; }
 @media (max-width:640px) { .param__themes, .param__grille { grid-template-columns:1fr; } }
 `
@@ -44,7 +45,12 @@ const heureCourte = (h) => String(h ?? '').slice(0, 5)
 export default function ParamPage() {
   const [theme, setTheme] = useState('system')
   const [hotelId, setHotelId] = useState(null)
-  const [form, setForm] = useState({ arrivee: '15:00', depart: '11:00', marge: '60' })
+  const [form, setForm] = useState({
+    arrivee: '15:00',
+    depart: '11:00',
+    marge: '60',
+    statutApresDepart: 'nettoyage'
+  })
   const [initial, setInitial] = useState(null)
   const [chargement, setChargement] = useState(false)
   const [succes, setSucces] = useState('')
@@ -61,7 +67,8 @@ export default function ParamPage() {
       const valeurs = {
         arrivee: heureCourte(h.heureArrivee),
         depart: heureCourte(h.heureDepart),
-        marge: String(h.margeNettoyageMinutes)
+        marge: String(h.margeNettoyageMinutes),
+        statutApresDepart: h.statutChambreApresDepart ?? 'nettoyage'
       }
       setForm(valeurs)
       setInitial(valeurs)
@@ -87,7 +94,12 @@ export default function ParamPage() {
     }
   }
 
-  const modifie = initial && (form.arrivee !== initial.arrivee || form.depart !== initial.depart || form.marge !== initial.marge)
+  const modifie =
+    initial &&
+    (form.arrivee !== initial.arrivee ||
+      form.depart !== initial.depart ||
+      form.marge !== initial.marge ||
+      form.statutApresDepart !== initial.statutApresDepart)
 
   async function enregistrerHotel() {
     if (!form.arrivee || !form.depart) return setEchec('Indiquez les heures d’arrivée et de départ.')
@@ -100,7 +112,8 @@ export default function ParamPage() {
       await window.electronAPI.update('hotel', hotelId, {
         heureArrivee: `${form.arrivee}:00`,
         heureDepart: `${form.depart}:00`,
-        margeNettoyageMinutes: marge
+        margeNettoyageMinutes: marge,
+        statutChambreApresDepart: form.statutApresDepart
       })
       setInitial({ ...form })
       setSucces('Paramètres enregistrés.')
@@ -141,6 +154,17 @@ export default function ParamPage() {
               <Input label="Heure de départ" type="time" requis value={form.depart} onChange={maj('depart')} />
               <Input label="Marge de nettoyage (minutes)" type="number" min={0} max={240} value={form.marge} onChange={maj('marge')} />
             </div>
+            <Input
+              className="param__choix-fin"
+              label="Statut de la chambre après départ"
+              aide="Appliqué lorsque le personnel confirme le départ du client."
+              value={form.statutApresDepart}
+              onChange={maj('statutApresDepart')}
+              options={[
+                { valeur: 'disponible', libelle: 'Disponible' },
+                { valeur: 'nettoyage', libelle: 'En nettoyage' }
+              ]}
+            />
             <div className="param__pied">
               <Button chargement={chargement} disabled={!modifie} onClick={enregistrerHotel}>Enregistrer</Button>
             </div>

@@ -32,6 +32,12 @@ export const hotel = sqliteTable(
     heureDepart: text('heure_depart').notNull().default('11:00:00'),
     // Délai prévu pour nettoyer une chambre après un départ (notifications de nettoyage en retard)
     margeNettoyageMinutes: integer('marge_nettoyage_minutes').notNull().default(60),
+    // État appliqué à la chambre quand le personnel confirme le départ du client
+    statutChambreApresDepart: text('statut_chambre_apres_depart', {
+      enum: ['disponible', 'nettoyage']
+    })
+      .notNull()
+      .default('nettoyage'),
   },
   (t) => [
     check('hotel_etages_min', sql`${t.nombreEtages} >= 1`),

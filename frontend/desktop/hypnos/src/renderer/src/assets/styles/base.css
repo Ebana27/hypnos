@@ -122,14 +122,14 @@
   :root:not([data-theme='light']) {
     color-scheme: dark;
 
-    --color-background: var(--hypnos-black);
-    --color-background-soft: color-mix(in srgb, var(--hypnos-black) 94%, var(--soft-periwinkle));
-    --color-background-mute: color-mix(in srgb, var(--hypnos-black) 88%, var(--soft-periwinkle));
-    --color-surface: color-mix(in srgb, var(--hypnos-black) 92%, var(--medium-blue));
+    --color-background: #191b23;
+    --color-background-soft: #22252d;
+    --color-background-mute: #2b2f39;
+    --color-surface: #252832;
 
-    --color-text: color-mix(in srgb, var(--platinum) 85%, transparent);
-    --color-text-muted: color-mix(in srgb, var(--platinum) 58%, transparent);
-    --color-text-faint: color-mix(in srgb, var(--platinum) 38%, transparent);
+    --color-text: #f1f2f6;
+    --color-text-muted: #c2c5cf;
+    --color-text-faint: #a3a8b5;
 
     --color-accent: var(--soft-periwinkle);
     --color-accent-hover: color-mix(in srgb, var(--soft-periwinkle) 85%, var(--white));
@@ -138,8 +138,8 @@
     --color-accent-wash: color-mix(in srgb, var(--soft-periwinkle) 14%, transparent);
     --color-accent-contrast: var(--onyx);
 
-    --color-border: color-mix(in srgb, var(--soft-periwinkle) 24%, transparent);
-    --color-border-strong: color-mix(in srgb, var(--soft-periwinkle) 45%, transparent);
+    --color-border: #414552;
+    --color-border-strong: #5a5578;
     --color-shadow: var(--shadow-dark);
     --color-scrollbar: color-mix(in srgb, var(--amethyst-smoke) 45%, transparent);
   }
@@ -148,14 +148,14 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --color-background: var(--hypnos-black);
-  --color-background-soft: color-mix(in srgb, var(--hypnos-black) 94%, var(--soft-periwinkle));
-  --color-background-mute: color-mix(in srgb, var(--hypnos-black) 88%, var(--soft-periwinkle));
-  --color-surface: color-mix(in srgb, var(--hypnos-black) 92%, var(--medium-blue));
+  --color-background: #191b23;
+  --color-background-soft: #22252d;
+  --color-background-mute: #2b2f39;
+  --color-surface: #252832;
 
-  --color-text: color-mix(in srgb, var(--platinum) 85%, transparent);
-  --color-text-muted: color-mix(in srgb, var(--platinum) 58%, transparent);
-  --color-text-faint: color-mix(in srgb, var(--platinum) 38%, transparent);
+  --color-text: #f1f2f6;
+  --color-text-muted: #c2c5cf;
+  --color-text-faint: #a3a8b5;
 
   --color-accent: var(--soft-periwinkle);
   --color-accent-hover: color-mix(in srgb, var(--soft-periwinkle) 85%, var(--white));
@@ -164,8 +164,8 @@
   --color-accent-wash: color-mix(in srgb, var(--soft-periwinkle) 14%, transparent);
   --color-accent-contrast: var(--onyx);
 
-  --color-border: color-mix(in srgb, var(--soft-periwinkle) 24%, transparent);
-  --color-border-strong: color-mix(in srgb, var(--soft-periwinkle) 45%, transparent);
+  --color-border: #414552;
+  --color-border-strong: #5a5578;
   --color-shadow: var(--shadow-dark);
   --color-scrollbar: color-mix(in srgb, var(--amethyst-smoke) 45%, transparent);
 }

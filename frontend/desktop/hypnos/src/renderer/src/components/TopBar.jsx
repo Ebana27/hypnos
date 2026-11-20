@@ -8,7 +8,13 @@ const formatLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padSta
 const borne = (value, time) => {
   const s = String(value ?? '')
   if (!s) return ''
-  return s.length === 10 ? `${s}T${time}` : s.slice(0, 16)
+  return s.length === 10 ? `${s}T${time}` : s.slice(0, 16).replace(' ', 'T')
+}
+const horaireLisible = (value) => {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? 'horaire prévu dépassé'
+    : date.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
 }
 function libelleNotifications(nombre) {
   if (nombre === 0) return 'Aucune notification'
@@ -99,6 +105,40 @@ export default function Topbar() {
       detail: minutes === null ? 'À traiter : la chambre est marquée en nettoyage.' : `Depuis ${minutes} min${minutes >= attente ? ' — délai prévu dépassé, vérifier le ménage.' : '.'}`
     })
   }
+  const chambresParId = new Map(chambres.map((chambre) => [Number(chambre.id), chambre]))
+  const heureArrivee = String(hotel?.heureArrivee || '15:00').slice(0, 5)
+  const heureDepart = String(hotel?.heureDepart || '11:00').slice(0, 5)
+  for (const reservation of reservations) {
+    const chambre = chambresParId.get(Number(reservation.chambreId))
+    const numeroChambre = chambre?.numero ?? reservation.chambreId
+    if (reservation.statut === 'confirmee') {
+      const arriveePrevue = borne(reservation.dateDebut, heureArrivee)
+      if (arriveePrevue && arriveePrevue <= now) {
+        notifications.push({
+          id: `retard-arrivee-${reservation.id}`,
+          vers: '/booking',
+          etat: { recherche: String(numeroChambre) },
+          urgente: true,
+          ouvrirAutomatiquement: false,
+          titre: `Arrivée en retard · chambre ${numeroChambre}`,
+          detail: `Arrivée prévue le ${horaireLisible(arriveePrevue)}. Vérifiez la présence du client puis confirmez l’arrivée dans la réservation.`
+        })
+      }
+    } else if (reservation.statut === 'en_sejour') {
+      const departPrevu = borne(reservation.dateFin, heureDepart)
+      if (departPrevu && departPrevu <= now) {
+        notifications.push({
+          id: `retard-depart-${reservation.id}`,
+          vers: '/booking',
+          etat: { recherche: String(numeroChambre) },
+          urgente: true,
+          ouvrirAutomatiquement: false,
+          titre: `Départ en retard · chambre ${numeroChambre}`,
+          detail: `Départ prévu le ${horaireLisible(departPrevu)}. Confirmez le départ après la sortie du client.`
+        })
+      }
+    }
+  }
   if (chambres.length > 0) {
     const toutesIndisponibles = chambres.every((c) => {
       if (c.statut === 'maintenance' || c.statut === 'nettoyage') return true
@@ -110,7 +150,11 @@ export default function Topbar() {
 
   // Le panneau ne s'ouvre seul que pour une alerte URGENTE jamais montrée :
   // un simple nettoyage en cours ne doit pas surgir au milieu d'une saisie.
-  const cleUrgentes = notifications.filter((n) => n.urgente).map((n) => n.id).sort().join('|')
+  const cleUrgentes = notifications
+    .filter((n) => n.urgente && n.ouvrirAutomatiquement !== false)
+    .map((n) => n.id)
+    .sort()
+    .join('|')
   useEffect(() => {
     const nouvelles = cleUrgentes.split('|').filter((id) => id && !alertesVuesRef.current.has(id))
     if (nouvelles.length > 0) {
@@ -157,14 +201,58 @@ export default function Topbar() {
         <div className="topbar__notif-conteneur" ref={conteneurRef}>
           <button type="button" className="topbar__notif" aria-label={libelleNotifications(notifications.length)} aria-expanded={ouvert} aria-controls="panneau-notifications" aria-haspopup="dialog" onClick={() => setOuvert((value) => !value)}>
             <Bell size={18} strokeWidth={1.8} />
-            {notifications.length > 0 && <span className="topbar__pastille">{notifications.length > 99 ? '99+' : notifications.length}</span>}
+            {notifications.length > 0 && (
+              <span className="topbar__pastille">
+                {notifications.length > 99 ? '99+' : notifications.length}
+              </span>
+            )}
           </button>
-          {ouvert && <section className="topbar__notifications" id="panneau-notifications" role="dialog" aria-label="Notifications">
-            <div className="topbar__notifications-entete"><h2 className="topbar__notifications-titre">Notifications</h2><button type="button" className="topbar__notifications-fermer" aria-label="Fermer les notifications" onClick={() => setOuvert(false)}><X size={16} /></button></div>
-            {notifications.length
-              ? <ul className="topbar__notifications-liste">{notifications.map((n) => <li key={n.id}><button type="button" className={`topbar__notification${n.urgente ? ' topbar__notification--alerte' : ''}`} onClick={() => { setOuvert(false); navigate(n.vers, n.etat ? { state: n.etat } : undefined) }}><strong>{n.titre}</strong>{n.detail}</button></li>)}</ul>
-              : <div className="topbar__notifications-vide"><strong>Aucune notification pour le moment</strong><p>Les alertes de nettoyage et de disponibilité apparaîtront ici.</p></div>}
-          </section>}
+          {ouvert && (
+            <section
+              className="topbar__notifications"
+              id="panneau-notifications"
+              role="dialog"
+              aria-label="Notifications"
+            >
+              <div className="topbar__notifications-entete">
+                <h2 className="topbar__notifications-titre">Notifications</h2>
+                <button
+                  type="button"
+                  className="topbar__notifications-fermer"
+                  aria-label="Fermer les notifications"
+                  onClick={() => setOuvert(false)}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              {notifications.length ? (
+                <ul className="topbar__notifications-liste">
+                  {notifications.map((n) => (
+                    <li key={n.id}>
+                      <button
+                        type="button"
+                        className={`topbar__notification${n.urgente ? ' topbar__notification--alerte' : ''}`}
+                        onClick={() => {
+                          setOuvert(false)
+                          navigate(n.vers, n.etat ? { state: n.etat } : undefined)
+                        }}
+                      >
+                        <strong>{n.titre}</strong>
+                        {n.detail}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="topbar__notifications-vide">
+                  <strong>Aucune notification pour le moment</strong>
+                  <p>
+                    Les alertes de nettoyage, de disponibilité et les retards de séjour apparaîtront ici.
+                  </p>
+                </div>
+              )}
+            </section>
+          )}
         </div>
         <div className="topbar__profil"><span className="topbar__avatar" aria-hidden="true">{nom.charAt(0)}</span><div className="topbar__infos"><span className="topbar__nom">{nom}</span><span className="topbar__role">{role}</span></div></div>
       </div>

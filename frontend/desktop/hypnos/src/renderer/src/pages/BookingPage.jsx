@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 // Page Réservations : liste, planning, nouvelle réservation (grille), fiche d'une réservation (blocs horizontaux).
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import {
   CalendarRange,
@@ -74,10 +75,105 @@ const LIBELLES_PAIEMENT = {
 const estMobileMoney = (mode) => mode === 'mtn_money' || mode === 'airtel_money'
 
 function AideSurvol({ texte, className = '', children }) {
+  const id = useId()
+  const boutonRef = useRef(null)
+  const infobulleRef = useRef(null)
+  const timerRef = useRef(null)
+  const [ouvert, setOuvert] = useState(false)
+  const [position, setPosition] = useState(null)
+
+  const annulerFermeture = () => {
+    window.clearTimeout(timerRef.current)
+    timerRef.current = null
+  }
+  const ouvrir = () => {
+    annulerFermeture()
+    setOuvert(true)
+  }
+  const fermerAvecDelai = () => {
+    annulerFermeture()
+    timerRef.current = window.setTimeout(() => setOuvert(false), 180)
+  }
+
+  useEffect(() => () => window.clearTimeout(timerRef.current), [])
+
+  useLayoutEffect(() => {
+    if (!ouvert) return undefined
+
+    const placer = () => {
+      const ancre = boutonRef.current?.getBoundingClientRect()
+      const boite = infobulleRef.current?.getBoundingClientRect()
+      if (!ancre || !boite) return
+
+      const marge = 12
+      const espace = 8
+      const gauche = Math.min(
+        Math.max(ancre.left + ancre.width / 2 - boite.width / 2, marge),
+        Math.max(marge, window.innerWidth - boite.width - marge)
+      )
+      const placerAuDessus =
+        ancre.top - boite.height - espace >= marge ||
+        ancre.bottom + boite.height + espace > window.innerHeight - marge
+      const haut = placerAuDessus
+        ? Math.max(marge, ancre.top - boite.height - espace)
+        : Math.min(window.innerHeight - boite.height - marge, ancre.bottom + espace)
+
+      setPosition({ left: gauche, top: haut })
+    }
+
+    placer()
+    const image = window.requestAnimationFrame(placer)
+    window.addEventListener('resize', placer)
+    window.addEventListener('scroll', placer, true)
+    const fermerEchap = (event) => {
+      if (event.key === 'Escape') setOuvert(false)
+    }
+    document.addEventListener('keydown', fermerEchap)
+
+    return () => {
+      window.cancelAnimationFrame(image)
+      window.removeEventListener('resize', placer)
+      window.removeEventListener('scroll', placer, true)
+      document.removeEventListener('keydown', fermerEchap)
+    }
+  }, [ouvert, texte])
+
   return (
-    <div className={`resa-new__aide-champ ${className}`.trim()} data-aide={texte}>
-      <span className="resa-new__aide-icone" aria-hidden="true">i</span>
+    <div className={`resa-new__aide-champ ${className}`.trim()}>
       {children}
+      <button
+        ref={boutonRef}
+        type="button"
+        className="resa-new__aide-icone"
+        aria-label="Afficher l’aide"
+        aria-describedby={ouvert ? id : undefined}
+        aria-expanded={ouvert}
+        onPointerEnter={ouvrir}
+        onPointerLeave={fermerAvecDelai}
+        onFocus={ouvrir}
+        onBlur={fermerAvecDelai}
+      >
+        i
+      </button>
+      {ouvert &&
+        createPortal(
+          <div
+            ref={infobulleRef}
+            id={id}
+            role="tooltip"
+            className="resa-new__infobulle"
+            style={{
+              left: position?.left ?? 0,
+              top: position?.top ?? 0,
+              visibility: position ? 'visible' : 'hidden'
+            }}
+            onPointerEnter={ouvrir}
+            onPointerLeave={fermerAvecDelai}
+          >
+            {texte}
+          </div>,
+          document.body
+        )}
     </div>
   )
 }
@@ -392,11 +488,6 @@ const STYLES = `
 
 /* ---------- Nouvelle réservation : champs contraints, panneaux aérés ---------- */
 .resa-new {
-  /* ---- Réglage des infobulles (AideSurvol) ---- */
-  --aide-delai-apparition: 500ms;   /* attente avant d'afficher l'infobulle au survol */
-  --aide-duree-apparition: 150ms;   /* durée du fondu d'apparition */
-  --aide-delai-disparition: 0ms;    /* attente avant de la masquer quand la souris part */
-  --aide-duree-disparition: 200ms;  /* durée du fondu de disparition */
   display: grid;
   grid-template-columns: minmax(0, .86fr) minmax(0, 1.14fr);
   gap: 14px;
@@ -494,13 +585,12 @@ const STYLES = `
 .resa-new__net strong { font-family: var(--font-display); font-size: 20px; color: var(--color-accent); }
 .resa-new__note { margin: 0; font-size: 11px; color: var(--color-text-faint); }
 .resa-new__aide-champ { position:relative; width:100%; min-width:0; }
-.resa-new__aide-champ:hover, .resa-new__aide-champ:focus-within { z-index:31; }
 .resa-new__aide-only { height:18px; }
 .resa-new__actions { grid-column:1 / -1; display:flex; justify-content:flex-end; padding-top:10px; border-top:1px solid var(--color-border); }
-.resa-new__aide-icone { position:absolute; z-index:2; top:2px; right:2px; display:grid; place-items:center; width:16px; height:16px; border:1px solid var(--color-border); border-radius:50%; background:var(--color-surface); color:var(--color-text-muted); font-size:10px; font-weight:700; pointer-events:none; }
+.resa-new__aide-icone { position:absolute; z-index:2; top:2px; right:2px; display:grid; place-items:center; width:18px; height:18px; padding:0; border:1px solid var(--color-border); border-radius:50%; background:var(--color-surface); color:var(--color-text-muted); font-family:inherit; font-size:10px; font-weight:700; line-height:1; cursor:help; }
+.resa-new__aide-icone:hover, .resa-new__aide-icone:focus-visible { border-color:var(--color-accent); color:var(--color-accent); outline:2px solid var(--color-accent-wash); outline-offset:2px; }
 .resa-new__aide-champ label { padding-right:22px; cursor:help; }
-.resa-new__aide-champ::after { content:attr(data-aide); position:absolute; z-index:30; left:0; bottom:calc(100% + 6px); width:max-content; max-width:min(280px, calc(100vw - 40px)); padding:8px 10px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-text); color:var(--color-surface); box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:12px; line-height:1.4; white-space:normal; overflow-wrap:anywhere; opacity:0; transform:translateY(3px); pointer-events:none; transition:opacity var(--aide-duree-disparition) ease var(--aide-delai-disparition), transform var(--aide-duree-disparition) ease var(--aide-delai-disparition); }
-.resa-new__aide-champ:hover::after, .resa-new__aide-champ:focus-within::after { opacity:1; transform:translateY(0); transition:opacity var(--aide-duree-apparition) ease var(--aide-delai-apparition), transform var(--aide-duree-apparition) ease var(--aide-delai-apparition); }
+.resa-new__infobulle { position:fixed; z-index:3200; width:max-content; max-width:min(280px, calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow-y:auto; padding:9px 11px; border:1px solid var(--color-border); border-radius:var(--radius-s); background:var(--color-surface); color:var(--color-text); box-shadow:var(--color-shadow); font-size:12px; line-height:1.45; white-space:normal; overflow-wrap:anywhere; }
 .resa-new__infos-supp { display:grid; gap:8px; padding-top:8px; border-top:1px solid var(--color-border); }
 .resa-new__onglets { display:flex; gap:6px; flex-wrap:wrap; }
 .resa-new__onglet { padding:6px 9px; border:1px solid var(--color-border); border-radius:var(--radius-pill); background:var(--color-surface); color:var(--color-text-muted); font:inherit; font-size:11px; cursor:pointer; }
@@ -1715,19 +1805,18 @@ export default function BookingPage({ vueInitiale = 'liste', pleinEcran: pleinEc
   const retirerConso = (consoId) =>
     executer(() => window.electronAPI.remove('consommation', consoId), 'Consommation retirée.')
 
-  // Arrivée : la chambre devient occupée. Départ : elle passe en nettoyage.
+  // Les statuts changent seulement après confirmation du personnel dans la fiche.
   async function changerStatut(r, action, options = {}) {
     const api = window.electronAPI
     if (action === 'arrivee') {
       await executer(() => api.arrivee(r.id), `Arrivée enregistrée : chambre ${r.numeroChambre}.`)
     } else if (action === 'depart') {
-      const ok = await executer(
+      const paiementEnAttente =
+        r.reste > 0 ? ` Paiement en attente : ${formatArgent(r.reste)} ${DEVISE}.` : ''
+      await executer(
         () => api.depart(r.id),
-        r.reste > 0 ? '' : `Départ enregistré : chambre ${r.numeroChambre} à nettoyer.`
+        `Départ enregistré. Statut de la chambre appliqué selon le réglage de l’hôtel.${paiementEnAttente}`
       )
-      if (ok && r.reste > 0) {
-        setEchec(`Départ enregistré, mais il reste ${formatArgent(r.reste)} ${DEVISE} à payer.`)
-      }
     } else if (action === 'annuler') {
       const ok = await executer(() => api.annuler(r.id, options), 'Réservation annulée.')
       if (ok) setSelectionId(null)

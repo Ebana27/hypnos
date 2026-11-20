@@ -334,6 +334,9 @@ async function initialiserBase() {
       ['mode_paiement', "TEXT NOT NULL DEFAULT 'especes'"],
       ['numero_paiement', "TEXT NOT NULL DEFAULT ''"]
     ])
+    await ajouterColonnes('hotel', [
+      ['statut_chambre_apres_depart', "TEXT NOT NULL DEFAULT 'nettoyage'"]
+    ])
   }
 
   // Après les migrations, car elles manipulent cette option.
@@ -487,6 +490,14 @@ async function verifierHotel(data) {
       throw new ErreurMetier('La marge de nettoyage doit être comprise entre 0 et 240 minutes.')
     }
     data.margeNettoyageMinutes = marge
+  }
+  if (
+    data.statutChambreApresDepart !== undefined &&
+    !['disponible', 'nettoyage'].includes(data.statutChambreApresDepart)
+  ) {
+    throw new ErreurMetier(
+      'Le statut de chambre après départ doit être « disponible » ou « nettoyage ».'
+    )
   }
   return data
 }
@@ -877,17 +888,31 @@ enregistrer('reservation:arrivee', async (id) => {
   return resultat
 })
 
-// Un départ avec reste à payer est permis : la réservation s'affiche alors « Paiement en attente ».
+// Le personnel confirme le départ : l'état de la chambre suit la préférence de l'hôtel.
+// Un solde restant est conservé comme « Paiement en attente » dans l'affichage de la réservation.
 enregistrer('reservation:depart', async (id) => {
   const resultat = await db.transaction(async (tx) => {
     const [r] = await tx.select().from(reservation).where(eq(reservation.id, Number(id)))
     if (!r) throw new ErreurMetier('Réservation introuvable.')
     if (r.statut !== 'en_sejour') throw new ErreurMetier("Le départ n'est possible que pour un séjour en cours.")
 
+    const [utilisateur] = session?.userId
+      ? await tx.select({ hotelId: user.hotelId }).from(user).where(eq(user.id, session.userId))
+      : []
+    const [hotelActif] = utilisateur
+      ? await tx
+          .select({ statutChambreApresDepart: hotel.statutChambreApresDepart })
+          .from(hotel)
+          .where(eq(hotel.id, utilisateur.hotelId))
+      : []
+    const statutChambre = ['disponible', 'nettoyage'].includes(hotelActif?.statutChambreApresDepart)
+      ? hotelActif.statutChambreApresDepart
+      : 'nettoyage'
+
     await tx.update(reservation).set({ statut: 'terminee' }).where(eq(reservation.id, r.id))
     await tx
       .update(chambre)
-      .set({ statut: 'nettoyage', statutDepuis: new Date().toISOString() })
+      .set({ statut: statutChambre, statutDepuis: new Date().toISOString() })
       .where(eq(chambre.id, r.chambreId))
     return { success: true }
   })
