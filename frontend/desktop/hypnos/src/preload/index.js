@@ -30,7 +30,7 @@ async function appeler(canal, ...args) {
       /^Error invoking remote method '[^']+': (Error: )?/,
       ''
     )
-    throw new Error(message)
+    throw new Error(message, { cause: e })
   }
 }
 
@@ -56,6 +56,7 @@ const api = {
     etat: () => appeler('maj:etat'),
     verifier: () => appeler('maj:verifier'),
     telecharger: () => appeler('maj:telecharger'),
+    annuler: () => appeler('maj:annuler'),
     installer: () => appeler('maj:installer'),
     // Renvoie une fonction de désinscription (à appeler dans le nettoyage de useEffect)
     surChangement: (rappel) => {

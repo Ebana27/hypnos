@@ -95,8 +95,8 @@ export default function Login({ onDemo, onCreerHotel }) {
 
           <div className="login__champs">
             <Input
-              label="Adresse e-mail"
-              placeholder="vous@hotel.cg"
+              label="Nom d’utilisateur"
+              placeholder="ex. reception.hotel"
               autoComplete="username"
               autoFocus
               value={identifiant}

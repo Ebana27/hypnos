@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
-import { Feather, Minus, X } from 'lucide-react'
+import { Minus, X } from 'lucide-react'
 import injecterStyles from './injecterStyles'
+import logotypeWhite from '../../assets/images/logotype_white.png'
 
 const STYLES = `
 /* ---------- Disposition commune des écrans d'accès ---------- */
@@ -118,16 +119,16 @@ const STYLES = `
   pointer-events: none;
 }
 .marque__cercle--bas {
-  left: -58%;
-  top: 54%;
-  width: 143%;
-  background: color-mix(in srgb, var(--soft-periwinkle) 38%, transparent);
+  left: -46%;
+  top: 58%;
+  width: 124%;
+  background: rgba(119, 133, 255, 0.36);
 }
 .marque__cercle--haut {
-  left: 36%;
-  top: -21%;
-  width: 101%;
-  background: color-mix(in srgb, var(--white) 10%, transparent);
+  left: 56%;
+  top: -30%;
+  width: 72%;
+  background: rgba(255, 255, 255, 0.1);
 }
 .marque__haut,
 .marque__centre,
@@ -144,22 +145,12 @@ const STYLES = `
 .marque__logo {
   display: flex;
   align-items: center;
-  gap: 10px;
 }
-.marque__icone {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: var(--color-brand-contrast, var(--white));
-  color: var(--color-brand, var(--medium-blue));
-}
-.marque__nom {
-  font-family: var(--font-display);
-  font-size: 30px;
-  font-weight: 600;
-  line-height: 1;
+.marque__logotype {
+  display: block;
+  width: 174px;
+  max-width: 100%;
+  height: auto;
 }
 .marque__centre {
   display: grid;
@@ -266,10 +257,7 @@ export default function PanneauMarque({
 
       <div className="marque__haut">
         <div className="marque__logo">
-          <span className="marque__icone">
-            <Feather size={22} strokeWidth={2} aria-hidden="true" />
-          </span>
-          <span className="marque__nom">Hypnos</span>
+          <img className="marque__logotype" src={logotypeWhite} alt="Hypnos" />
         </div>
         {coin}
       </div>

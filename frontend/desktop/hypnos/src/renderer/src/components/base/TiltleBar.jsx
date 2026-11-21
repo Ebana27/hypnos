@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 import { useEffect, useState } from 'react'
 import { Minus, Square, Copy, X } from 'lucide-react'
 import logoHypnos from '../../assets/images/logotype.png'
@@ -58,6 +59,19 @@ const STYLES = {
     background: 'rgba(255, 255, 255, 0.3)',
     overflow: 'hidden'
   },
+  annulerMaj: {
+    display: 'grid',
+    placeItems: 'center',
+    width: '22px',
+    height: '22px',
+    padding: 0,
+    border: 'none',
+    borderRadius: '50%',
+    background: 'rgba(255, 255, 255, 0.16)',
+    color: '#fff',
+    cursor: 'pointer',
+    WebkitAppRegion: 'no-drag'
+  },
   remplissage: { height: '100%', background: '#fff', transition: 'width 0.2s' }
 }
 
@@ -92,6 +106,15 @@ function IndicateurMaj({ maj }) {
         <div style={STYLES.piste}>
           <div style={{ ...STYLES.remplissage, width: `${maj.pourcent}%` }} />
         </div>
+        <button
+          type="button"
+          style={STYLES.annulerMaj}
+          onClick={() => window.api.maj.annuler().catch(() => {})}
+          aria-label="Annuler le téléchargement de la mise à jour"
+          title="Annuler le téléchargement"
+        >
+          <X size={14} aria-hidden="true" />
+        </button>
       </div>
     )
   }

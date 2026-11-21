@@ -301,11 +301,11 @@ async function initialiserBase() {
   // Les anciennes lignes conservent leurs tarifs nuit; les tarifs ajoutés démarrent à 0.
   if (prete) {
     const ajouterColonnes = async (table, colonnes) => {
-      const existantes = await db.all(sql.raw(`PRAGMA table_info(\"${table}\")`))
+      const existantes = await db.all(sql.raw(`PRAGMA table_info("${table}")`))
       if (!existantes.length) return
       const noms = new Set(existantes.map((c) => c.name))
       for (const [nom, definition] of colonnes) {
-        if (!noms.has(nom)) await db.run(sql.raw(`ALTER TABLE \"${table}\" ADD COLUMN \"${nom}\" ${definition}`))
+        if (!noms.has(nom)) await db.run(sql.raw(`ALTER TABLE "${table}" ADD COLUMN "${nom}" ${definition}`))
       }
     }
     await ajouterColonnes('type_de_chambre', [
@@ -984,6 +984,10 @@ function validerCreation(d) {
   const nomFamille = texte(d?.nomFamille)
   if (!prenom || !nomFamille) throw new ErreurMetier('Indiquez votre prénom et votre nom.')
 
+  const username = texte(d?.username).toLowerCase()
+  if (!/^[a-z0-9._-]{3,30}$/.test(username)) {
+    throw new ErreurMetier('Le nom d’utilisateur doit compter 3 à 30 caractères (lettres, chiffres, point, tiret ou tiret bas).')
+  }
   const email = texte(d?.email).toLowerCase()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ErreurMetier('Adresse e-mail invalide.')
 
@@ -993,7 +997,7 @@ function validerCreation(d) {
   return {
     nom, ville, adresse: texte(d?.adresse), tel: texte(d?.tel),
     etagesHauts, chambresParEtage, chambresRez, tarif, arrivee, depart,
-    prenom, nomFamille, email, motDePasse
+    prenom, nomFamille, username, email, motDePasse
   }
 }
 
@@ -1003,6 +1007,8 @@ enregistrer(
   async (donnees) => {
     if (await hotelExiste()) throw new ErreurMetier('Un hôtel existe déjà sur cet ordinateur.')
     const p = validerCreation(donnees)
+    const identifiantExistant = await db.select({ id: user.id }).from(user).where(eq(user.username, p.username)).limit(1)
+    if (identifiantExistant.length) throw new ErreurMetier('Ce nom d’utilisateur est déjà utilisé.')
     const empreinte = await hacherMotDePasse(p.motDePasse)
     const niveaux = p.etagesHauts + 1 // rez-de-chaussée compris
     const plan = planChambres(p.etagesHauts, p.chambresParEtage, p.chambresRez)
@@ -1041,7 +1047,7 @@ enregistrer(
         .insert(user)
         .values({
           hotelId: h.id,
-          username: p.email,
+          username: p.username,
           email: p.email,
           firstName: p.prenom,
           lastName: p.nomFamille,
@@ -1112,6 +1118,8 @@ enregistrer('session:courante', async () => {
 let etatMaj = { etat: 'aucune' }
 let majPromise = null // démarrage unique (évite les doubles écouteurs et le double minuteur)
 let updater = null
+let majCancellationToken = null
+let versionMaj = null
 
 // electron-updater est chargé à la demande : jamais en développement, et en parallèle du
 // chargement de la fenêtre principale dans l'application installée.
@@ -1147,11 +1155,18 @@ async function demarrerMisesAJour() {
 
   u.on('checking-for-update', () => diffuserMaj({ etat: 'verification' }))
   u.on('update-not-available', () => diffuserMaj({ etat: 'aucune' }))
-  u.on('update-available', (info) => diffuserMaj({ etat: 'disponible', version: info.version }))
+  u.on('update-available', (info) => {
+    versionMaj = info.version
+    diffuserMaj({ etat: 'disponible', version: info.version })
+  })
   u.on('download-progress', (p) =>
     diffuserMaj({ etat: 'telechargement', pourcent: Math.round(p.percent) })
   )
   u.on('update-downloaded', (info) => diffuserMaj({ etat: 'prete', version: info.version }))
+  u.on('update-cancelled', () => {
+    majCancellationToken = null
+    diffuserMaj({ etat: 'disponible', version: versionMaj })
+  })
   u.on('error', (e) => {
     // Hors connexion ou dépôt injoignable : on ne dérange pas l'utilisateur
     console.error('Mise à jour :', e)
@@ -1184,8 +1199,24 @@ enregistrer('maj:telecharger', async () => {
   if (is.dev) throw new ErreurMetier('Les mises à jour sont désactivées en développement.')
   if (etatMaj.etat !== 'disponible') throw new ErreurMetier('Aucune mise à jour à télécharger.')
   const u = await initialiserMisesAJour()
+  const { CancellationToken } = await import('builder-util-runtime')
+  const token = new CancellationToken()
+  majCancellationToken = token
   diffuserMaj({ etat: 'telechargement', pourcent: 0 })
-  await u.downloadUpdate()
+  try {
+    await u.downloadUpdate(token)
+  } catch (e) {
+    if (!token.cancelled) throw e
+  } finally {
+    if (majCancellationToken === token) majCancellationToken = null
+  }
+  return { success: true }
+})
+enregistrer('maj:annuler', async () => {
+  if (!majCancellationToken || etatMaj.etat !== 'telechargement') {
+    throw new ErreurMetier('Aucun téléchargement de mise à jour à annuler.')
+  }
+  majCancellationToken.cancel()
   return { success: true }
 })
 

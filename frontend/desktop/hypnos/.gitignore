@@ -5,3 +5,4 @@ out
 .eslintcache
 *.log*
 local.db
+src/renderer/src/assets/fonts/*.woff2

@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { BarreFenetre } from './base/PanneauMarque'
 import injecterStyles from './base/injecterStyles'
@@ -21,33 +21,12 @@ const DIAPOSITIVES = [
 ]
 const DERNIERE = DIAPOSITIVES.length - 1
 
-const DUREE_SORTIE = 480 // ms : les lettres s'envolent avant le changement de texte
+const DUREE_SORTIE = 320 // ms : le bloc de texte s'efface avant le changement de diapositive
 const DUREE_FIN = 700 // ms : sortie générale quand on quitte la présentation
 
 const clamp = (x, min, max) => Math.min(max, Math.max(min, x))
 const mouvementReduit = () =>
   typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
-
-// ---------- Texte animé lettre par lettre ----------
-// Les mots restent insécables : le retour à la ligne ne coupe jamais un mot en deux.
-function Lettres({ texte, depart = 0 }) {
-  let n = depart
-  const mots = texte.split(' ')
-  return mots.map((mot, m) => (
-    <Fragment key={m}>
-      <span className="onb__mot" aria-hidden="true">
-        {Array.from(mot).map((c, i) => (
-          <span key={i} className="onb__lettre" style={{ '--i': n++ }}>
-            {c}
-          </span>
-        ))}
-      </span>
-      {m < mots.length - 1 && ' '}
-    </Fragment>
-  ))
-}
-
-const compter = (texte) => Array.from(texte.replace(/ /g, '')).length
 
 // ---------- Fond : formes et dégradés de la maquette (viewBox 1512 x 982) ----------
 // Les trois formes existent en permanence. Celle de la diapositive active est en place ;
@@ -198,22 +177,25 @@ const STYLES = `
 .onb__bloc {
   position: absolute;
   inset: 0;
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.32s ease, transform 0.32s ease;
+}
+.onb__bloc--sortie {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 .onb__titre {
-  --debut: 120ms;
-  --pas: 34ms;
   position: absolute;
   left: calc(100 * var(--u));
   top: calc(326 * var(--u));
-  font-family: var(--font-display);
+  font-family: 'Clash Display', sans-serif;
   font-size: calc(80 * var(--u));
   font-weight: 700;
   line-height: calc(88 * var(--u));
   letter-spacing: -0.01em;
 }
 .onb__texte {
-  --debut: 650ms;
-  --pas: 9ms;
   position: absolute;
   left: calc(100 * var(--u));
   top: calc(533 * var(--u));
@@ -221,38 +203,6 @@ const STYLES = `
   font-size: calc(24 * var(--u));
   line-height: calc(30 * var(--u));
   opacity: 0.9;
-}
-
-/* Lettres */
-.onb__mot {
-  display: inline-block;
-  white-space: nowrap;
-}
-.onb__lettre {
-  display: inline-block;
-  opacity: 0;
-  animation: onb-lettre 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  animation-delay: calc(var(--debut) + var(--i) * var(--pas));
-}
-.onb__bloc--sortie .onb__lettre {
-  animation: onb-lettre-sortie 0.3s ease-in both;
-  animation-delay: min(calc(var(--i) * 5ms), 180ms);
-}
-.onb__sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-@keyframes onb-lettre {
-  from { opacity: 0; transform: translateY(0.45em); filter: blur(6px); }
-  to { opacity: 1; transform: none; filter: blur(0); }
-}
-@keyframes onb-lettre-sortie {
-  from { opacity: 1; transform: none; filter: blur(0); }
-  to { opacity: 0; transform: translateY(-0.35em); filter: blur(4px); }
 }
 
 .onb__pied {
@@ -318,8 +268,7 @@ const STYLES = `
   outline-offset: 3px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .onb__lettre,
-  .onb__bloc--sortie .onb__lettre { animation: none; opacity: 1; filter: none; transform: none; }
+  .onb__bloc { transition: none !important; }
   .onb__forme,
   .onb__scene,
   .onb__remplissage { transition: none !important; }
@@ -333,7 +282,7 @@ const deuxChiffres = (n) => String(n).padStart(2, '0')
 export default function Onboarding({ onFinish }) {
   const [index, setIndex] = useState(0) // diapositive dont le texte est affiché
   const [cible, setCible] = useState(0) // diapositive vers laquelle on va (fond, progression)
-  const [sortie, setSortie] = useState(false) // les lettres sont en train de partir
+  const [sortie, setSortie] = useState(false) // le texte s’efface avant le changement
   const [fin, setFin] = useState(false) // on quitte la présentation
   const [pret, setPret] = useState(false) // déclenche l'entrée du fond au premier affichage
 
@@ -357,7 +306,7 @@ export default function Onboarding({ onFinish }) {
     }
   }, [])
 
-  // Le fond bouge tout de suite ; le texte sort, puis le nouveau texte s'écrit
+  // Le fond bouge tout de suite ; le texte s’efface, puis change sans remonter le DOM.
   const aller = useCallback((n) => {
     if (finRef.current) return
     const v = clamp(n, 0, DERNIERE)
@@ -397,8 +346,6 @@ export default function Onboarding({ onFinish }) {
   const suivant = () => (dernier ? terminer() : aller(cible + 1))
 
   const fondActif = fin ? DIAPOSITIVES.length : pret ? cible : -1
-  const nbLettresTitre0 = compter(diapo.titre[0])
-
   return (
     <div className={`onb${fin ? ' onb--fin' : ''}`}>
       <Fond actif={fondActif} />
@@ -409,15 +356,14 @@ export default function Onboarding({ onFinish }) {
           {deuxChiffres(cible + 1)} / {deuxChiffres(DIAPOSITIVES.length)}
         </span>
 
-        <div className={`onb__bloc${sortie ? ' onb__bloc--sortie' : ''}`} key={index}>
+        <div className={`onb__bloc${sortie ? ' onb__bloc--sortie' : ''}`}>
           <h1 className="onb__titre" aria-label={diapo.titre.join(' ')}>
-            <Lettres texte={diapo.titre[0]} />
+            {diapo.titre[0]}
             <br />
-            <Lettres texte={diapo.titre[1]} depart={nbLettresTitre0} />
+            {diapo.titre[1]}
           </h1>
           <p className="onb__texte">
-            <span className="onb__sr">{diapo.texte}</span>
-            <Lettres texte={diapo.texte} />
+            {diapo.texte}
           </p>
         </div>
 

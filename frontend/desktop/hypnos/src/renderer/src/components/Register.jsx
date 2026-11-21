@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Minus, Plus } from 'lucide-react'
 import Button from './base/Button'
 import Input from './base/Input'
@@ -35,6 +35,7 @@ const FORMULAIRE_VIDE = {
   depart: '11:00',
   prenom: '',
   nomFamille: '',
+  username: '',
   email: '',
   motDePasse: '',
   confirmation: ''
@@ -48,28 +49,6 @@ const totalChambres = (f) => f.chambresRez + f.etagesHauts * f.chambresParEtage
 const clamp = (x, min, max) => Math.min(max, Math.max(min, x))
 const mouvementReduit = () =>
   typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
-
-// ============================================================
-//  TEXTE ANIMÉ LETTRE PAR LETTRE
-//  Les mots restent insécables : le retour à la ligne ne coupe jamais un mot.
-//  Le rythme se règle avec --debut et --pas sur le parent.
-// ============================================================
-function Lettres({ texte, depart = 0 }) {
-  let n = depart
-  const mots = texte.split(' ')
-  return mots.map((mot, m) => (
-    <Fragment key={m}>
-      <span className="lt__mot" aria-hidden="true">
-        {Array.from(mot).map((c, i) => (
-          <span key={i} className="lt__lettre" style={{ '--i': n++ }}>
-            {c}
-          </span>
-        ))}
-      </span>
-      {m < mots.length - 1 && ' '}
-    </Fragment>
-  ))
-}
 
 // ============================================================
 //  FOND : formes de la maquette (même univers que la présentation)
@@ -436,14 +415,10 @@ function PanneauGauche({ etape, niveaux, total, etagesHauts, chambresParEtage, c
 
       <div className={`volet__texte${batiment ? ' volet__texte--sortie' : ''}`} aria-hidden={batiment}>
         <p className="volet__titre" aria-label="Créez votre hôtel en 2 minutes.">
-          <Lettres texte="Créez votre hôtel en 2 minutes." />
+          Créez votre hôtel en 2 minutes.
         </p>
         <p className="volet__sous">
-          <span className="lt__sr">
-            Renseignez votre établissement et votre compte administrateur : vos chambres sont générées pour
-            vous.
-          </span>
-          <Lettres texte="Renseignez votre établissement et votre compte administrateur : vos chambres sont générées pour vous." />
+          Renseignez votre établissement et votre compte administrateur : vos chambres sont générées pour vous.
         </p>
       </div>
     </aside>
@@ -491,34 +466,6 @@ function Compteur({ label, valeur, min, max, onChange, aide, alerte }) {
 //  STYLE
 // ============================================================
 const STYLES = `
-/* ---------- Lettres ---------- */
-.lt__mot {
-  display: inline-block;
-  white-space: nowrap;
-}
-.lt__lettre {
-  display: inline-block;
-  opacity: 0;
-  animation: lt-entree 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  animation-delay: calc(var(--debut, 0ms) + var(--i) * var(--pas, 30ms));
-}
-.lt__sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-@keyframes lt-entree {
-  from { opacity: 0; transform: translateY(0.45em); filter: blur(6px); }
-  to { opacity: 1; transform: none; filter: blur(0); }
-}
-@keyframes lt-sortie {
-  from { opacity: 1; transform: none; filter: blur(0); }
-  to { opacity: 0; transform: translateY(-0.35em); filter: blur(4px); }
-}
-
 /* ---------- Panneau gauche ---------- */
 .volet {
   position: relative;
@@ -580,32 +527,26 @@ const STYLES = `
 .volet__texte {
   position: relative;
   z-index: 1;
+  transition: opacity 0.3s ease;
 }
 .volet__titre {
-  --debut: 200ms;
-  --pas: 30ms;
   margin-bottom: 14px;
-  font-family: var(--font-display);
+  font-family: 'Clash Display', sans-serif;
   font-size: clamp(28px, 3.1vw, 40px);
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: -0.02em;
 }
 .volet__sous {
-  --debut: 700ms;
-  --pas: 8ms;
   max-width: 34ch;
   font-size: 14px;
   line-height: 1.55;
   opacity: 0.85;
 }
-/* Étape « Bâtiment » : les lettres s'envolent (puis restent invisibles) */
+/* Étape « Bâtiment » : le texte s’efface sans rejouer son animation au retour. */
 .volet__texte--sortie {
   pointer-events: none;
-}
-.volet__texte--sortie .lt__lettre {
-  animation: lt-sortie 0.3s ease-in both;
-  animation-delay: min(calc(var(--i) * 5ms), 180ms);
+  opacity: 0;
 }
 
 .volet__scene {
@@ -690,8 +631,7 @@ const STYLES = `
   margin-bottom: 22px;
 }
 .wiz__titre {
-  --debut: 40ms;
-  --pas: 22ms;
+  font-family: 'Clash Display', sans-serif;
   font-size: 30px;
 }
 .wiz__corps {
@@ -796,9 +736,6 @@ const STYLES = `
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lt__lettre,
-  .volet__texte--sortie .lt__lettre { animation: none; opacity: 1; filter: none; transform: none; }
-  .volet__texte--sortie { opacity: 0; }
   .volet__forme,
   .volet__scene { transition: none !important; }
   .apercu__fenetre, .apercu__vitrine, .apercu__balcon, .wiz__corps { animation: none; }
@@ -827,6 +764,9 @@ function valider(etape, f) {
   if (etape === 3) {
     if (!f.prenom.trim()) e.prenom = 'Indiquez votre prénom.'
     if (!f.nomFamille.trim()) e.nomFamille = 'Indiquez votre nom.'
+    if (!/^[a-zA-Z0-9._-]{3,30}$/.test(f.username.trim())) {
+      e.username = '3 à 30 caractères : lettres, chiffres, point, tiret ou tiret bas.'
+    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) e.email = 'Adresse e-mail invalide.'
     if (f.motDePasse.length < 8) e.motDePasse = '8 caractères minimum.'
     if (f.confirmation !== f.motDePasse) e.confirmation = 'Les mots de passe ne correspondent pas.'
@@ -894,6 +834,7 @@ export default function Register({ onTermine }) {
         depart: form.depart,
         prenom: form.prenom,
         nomFamille: form.nomFamille,
+        username: form.username,
         email: form.email,
         motDePasse: form.motDePasse
       })
@@ -936,7 +877,7 @@ export default function Register({ onTermine }) {
     {
       etape: 3,
       titre: 'Compte',
-      valeur: `${form.prenom.trim()} ${form.nomFamille.trim()} · ${form.email.trim()}`
+      valeur: `${form.prenom.trim()} ${form.nomFamille.trim()} · ${form.username.trim()} · ${form.email.trim()}`
     }
   ]
 
@@ -1092,6 +1033,15 @@ export default function Register({ onTermine }) {
             />
           </div>
           <Input
+            label="Nom d’utilisateur"
+            requis
+            placeholder="ex. reception.hotel"
+            autoComplete="username"
+            value={form.username}
+            onChange={maj('username')}
+            erreur={erreurs.username}
+          />
+          <Input
             label="Adresse e-mail"
             requis
             placeholder="vous@hotel.cg"
@@ -1165,8 +1115,8 @@ export default function Register({ onTermine }) {
             valeur={((etape + 1) / ETAPES.length) * 100}
             libelle="Progression de la création de l’hôtel"
           />
-          <h1 className="auth__titre wiz__titre" key={etape} aria-label={ETAPES[etape].titre}>
-            <Lettres texte={ETAPES[etape].titre} />
+          <h1 className="auth__titre wiz__titre" aria-label={ETAPES[etape].titre}>
+            {ETAPES[etape].titre}
           </h1>
           <p className="auth__sous-titre">{ETAPES[etape].aide}</p>
 
