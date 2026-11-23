@@ -4,6 +4,7 @@ import { ArrowRight } from 'lucide-react'
 import { BarreFenetre } from './base/PanneauMarque'
 import injecterStyles from './base/injecterStyles'
 import logotype from '../assets/images/logotype_white.png'
+import illustrationPaiements from '../assets/images/onboarding-paiements-3d.png'
 
 const DIAPOSITIVES = [
   {
@@ -15,8 +16,8 @@ const DIAPOSITIVES = [
     texte: 'Suivez chaque séjour et l’état de vos chambres en temps réel, sans papier.'
   },
   {
-    titre: ['Reprenez vos', 'données Excel.'],
-    texte: 'Importez vos réservations, chambres et clients existants en quelques secondes.'
+    titre: ['Mobile Money', 'et cartes Visa.'],
+    texte: 'Gardez une trace des règlements par MTN MoMo et par carte Visa ou Mastercard, directement avec chaque séjour.'
   }
 ]
 const DERNIERE = DIAPOSITIVES.length - 1
@@ -163,70 +164,112 @@ const STYLES = `
   top: calc(66 * var(--u));
   height: calc(44 * var(--u));
   width: auto;
+  z-index: 2;
 }
 .onb__compteur {
   position: absolute;
-  right: calc(163 * var(--u));
+  right: calc(100 * var(--u));
   top: calc(72 * var(--u));
   font-family: var(--font-display);
   font-size: calc(36 * var(--u));
   font-weight: 500;
   line-height: 1;
   opacity: 0.9;
+  z-index: 2;
+}
+.onb__visuel {
+  position: absolute;
+  left: calc(66 * var(--u));
+  top: calc(190 * var(--u));
+  width: calc(660 * var(--u));
+  height: calc(600 * var(--u));
+  display: grid;
+  place-items: center;
+  z-index: 1;
+  pointer-events: none;
+}
+.onb__visuel::before {
+  content: '';
+  position: absolute;
+  width: 76%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,.22), rgba(139,161,255,.1) 52%, transparent 72%);
+  filter: blur(calc(12 * var(--u)));
+}
+.onb__illustration {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 calc(22 * var(--u)) calc(28 * var(--u)) rgba(0, 0, 35, .28));
 }
 .onb__bloc {
   position: absolute;
-  inset: 0;
+  left: calc(780 * var(--u));
+  right: calc(100 * var(--u));
+  top: calc(240 * var(--u));
+  bottom: calc(230 * var(--u));
+  display: flex;
+  align-items: center;
   opacity: 1;
   transform: none;
   transition: opacity 0.32s ease, transform 0.32s ease;
+  z-index: 1;
 }
 .onb__bloc--sortie {
   opacity: 0;
   transform: translateY(-10px);
 }
+.onb__contenu {
+  width: 100%;
+  max-width: calc(570 * var(--u));
+}
 .onb__titre {
-  position: absolute;
-  left: calc(100 * var(--u));
-  top: calc(326 * var(--u));
+  margin: 0 0 calc(22 * var(--u));
   font-family: 'Clash Display', sans-serif;
-  font-size: calc(80 * var(--u));
+  font-size: calc(72 * var(--u));
   font-weight: 700;
-  line-height: calc(88 * var(--u));
+  line-height: 1.08;
   letter-spacing: -0.01em;
 }
 .onb__texte {
-  position: absolute;
-  left: calc(100 * var(--u));
-  top: calc(533 * var(--u));
-  max-width: calc(470 * var(--u));
-  font-size: calc(24 * var(--u));
-  line-height: calc(30 * var(--u));
+  max-width: calc(530 * var(--u));
+  margin: 0;
+  font-size: calc(23 * var(--u));
+  line-height: 1.45;
   opacity: 0.9;
 }
 
 .onb__pied {
   position: absolute;
-  left: calc(100 * var(--u));
-  top: calc(796 * var(--u));
-  height: calc(52 * var(--u));
-  display: flex;
+  left: calc(780 * var(--u));
+  right: calc(100 * var(--u));
+  bottom: calc(76 * var(--u));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: calc(48 * var(--u));
+  gap: calc(22 * var(--u));
+  z-index: 2;
 }
 .onb__piste {
-  width: calc(892 * var(--u));
-  height: calc(12 * var(--u));
-  margin-top: calc(8 * var(--u));
-  background: var(--onb-piste);
+  grid-column: 1 / -1;
+  width: 100%;
+  height: calc(8 * var(--u));
+  margin: 0 0 calc(4 * var(--u));
+  border-radius: 999px;
+  background: rgba(255,255,255,.3);
 }
 .onb__remplissage {
   height: 100%;
+  border-radius: inherit;
   background: #fff;
   transition: width 0.6s cubic-bezier(0.65, 0, 0.25, 1);
 }
 .onb__passer {
-  width: calc(92 * var(--u));
+  grid-column: 2;
+  width: auto;
   padding: 0;
   border: 0;
   background: none;
@@ -240,6 +283,7 @@ const STYLES = `
 }
 .onb__passer:hover { opacity: 1; }
 .onb__suivant {
+  grid-column: 3;
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
@@ -356,15 +400,19 @@ export default function Onboarding({ onFinish }) {
           {deuxChiffres(cible + 1)} / {deuxChiffres(DIAPOSITIVES.length)}
         </span>
 
+        <div className="onb__visuel" aria-hidden="true">
+          <img className="onb__illustration" src={illustrationPaiements} alt="" />
+        </div>
+
         <div className={`onb__bloc${sortie ? ' onb__bloc--sortie' : ''}`}>
-          <h1 className="onb__titre" aria-label={diapo.titre.join(' ')}>
-            {diapo.titre[0]}
-            <br />
-            {diapo.titre[1]}
-          </h1>
-          <p className="onb__texte">
-            {diapo.texte}
-          </p>
+          <div className="onb__contenu">
+            <h1 className="onb__titre" aria-label={diapo.titre.join(' ')}>
+              {diapo.titre[0]}
+              <br />
+              {diapo.titre[1]}
+            </h1>
+            <p className="onb__texte">{diapo.texte}</p>
+          </div>
         </div>
 
         <div className="onb__pied">

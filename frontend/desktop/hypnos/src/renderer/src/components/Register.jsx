@@ -649,6 +649,7 @@ const STYLES = `
   font-size: 13px;
   color: var(--color-text-muted);
 }
+.wiz__code-secours { display:block; padding:18px 14px; border:1px solid var(--color-border); border-radius:var(--radius-m); background:var(--color-background-soft); font-family:monospace; font-size:clamp(18px,2.5vw,24px); font-weight:700; letter-spacing:.08em; line-height:1.5; text-align:center; user-select:all; overflow-wrap:anywhere; }
 .wiz__plus {
   display: flex;
 }
@@ -783,6 +784,8 @@ export default function Register({ onTermine }) {
   const [erreurs, setErreurs] = useState({})
   const [erreurGlobale, setErreurGlobale] = useState('')
   const [envoi, setEnvoi] = useState(false)
+  const [codeSecours, setCodeSecours] = useState('')
+  const [codeEnregistre, setCodeEnregistre] = useState(false)
   // Champs rarement utiles : repliés tant qu'on n'en a pas besoin
   const [adresseOuverte, setAdresseOuverte] = useState(false)
   const [rezOuvert, setRezOuvert] = useState(false)
@@ -821,7 +824,7 @@ export default function Register({ onTermine }) {
     setEnvoi(true)
     setErreurGlobale('')
     try {
-      await window.electronAPI.creerHotel({
+      const resultat = await window.electronAPI.creerHotel({
         nom: form.nom,
         ville: form.ville,
         adresse: form.adresse,
@@ -838,7 +841,7 @@ export default function Register({ onTermine }) {
         email: form.email,
         motDePasse: form.motDePasse
       })
-      onTermine() // la fenêtre se ferme, on garde l'indicateur
+      setCodeSecours(resultat.recoveryCode)
     } catch (err) {
       setErreurGlobale(err.message)
       setEnvoi(false)
@@ -880,6 +883,29 @@ export default function Register({ onTermine }) {
       valeur: `${form.prenom.trim()} ${form.nomFamille.trim()} · ${form.username.trim()} · ${form.email.trim()}`
     }
   ]
+
+  if (codeSecours) {
+    return (
+      <div className="auth">
+        <PanneauGauche etape={DERNIERE} niveaux={niveaux} total={total} etagesHauts={form.etagesHauts} chambresParEtage={form.chambresParEtage} chambresRez={form.chambresRez} />
+        <main className="auth__principal">
+          <section className="auth__formulaire wiz" aria-labelledby="code-secours-titre">
+            <h1 className="auth__titre wiz__titre" id="code-secours-titre">Gardez votre code de secours</h1>
+            <p className="auth__sous-titre">Il permet de retrouver l’accès si le nom d’utilisateur ou le mot de passe est oublié. Enregistrez-le hors de cet ordinateur; Hypnos ne pourra pas l’afficher une seconde fois.</p>
+            <output className="wiz__code-secours" aria-label="Code de secours">{codeSecours}</output>
+            <div className="wiz__actions">
+              <Button variante="secondaire" onClick={async () => {
+                try { await navigator.clipboard.writeText(codeSecours) } catch { /* le code reste sélectionnable */ }
+              }}>Copier le code</Button>
+              <Button disabled={!codeEnregistre} onClick={onTermine}>J’ai enregistré le code</Button>
+            </div>
+            <label className="wiz__note"><input type="checkbox" checked={codeEnregistre} onChange={(e) => setCodeEnregistre(e.target.checked)} /> J’ai conservé ce code dans un endroit sûr.</label>
+          </section>
+        </main>
+        <BarreFenetre />
+      </div>
+    )
+  }
 
   function corps() {
     if (etape === 0) {

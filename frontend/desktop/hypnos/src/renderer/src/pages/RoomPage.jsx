@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Check, Layers, Pencil, Plus } from 'lucide-react'
+import { Check, Layers, Pencil, Plus, Trash2 } from 'lucide-react'
 import Button from '../components/base/Button'
 import CardRoom, { STATUTS_CHAMBRE } from '../components/base/CardRoom'
 import FailToast from '../components/base/FailToast'
@@ -102,7 +102,7 @@ export default function RoomPage() {
   const [filtreCategorie, setFiltreCategorie] = useState(null)
   const [recherche, setRecherche] = useState('')
 
-  const [modale, setModale] = useState(null) // 'chambre' | 'modifier-chambre' | 'categories' | 'categorie' | 'statut'
+  const [modale, setModale] = useState(null) // 'chambre' | 'modifier-chambre' | 'categories' | 'categorie' | 'statut' | 'supprimer-chambre'
   const [selection, setSelection] = useState(null)
   const [categorieSelectionnee, setCategorieSelectionnee] = useState(null)
   const [chambreEnEdition, setChambreEnEdition] = useState(null)
@@ -533,10 +533,19 @@ export default function RoomPage() {
         pied={
           <div className="chambres__pied">
             <Button variante="secondaire" icone={Pencil} onClick={() => selection && modifierChambre(selection)}>Modifier chambre / catégorie</Button>
+            <Button
+              variante="danger-doux"
+              icone={Trash2}
+              disabled={chargement || reservations.some((r) => Number(r.chambreId) === Number(selection?.id))}
+              onClick={() => setModale('supprimer-chambre')}
+            >Supprimer</Button>
             <Button variante="fantome" onClick={fermer}>Fermer</Button>
           </div>
         }
       >
+        {reservations.some((r) => Number(r.chambreId) === Number(selection?.id)) && (
+          <p className="chambres__avertissement" role="note">Cette chambre apparaît dans l’historique de réservations; elle ne peut pas être supprimée afin de préserver les séjours et les encaissements associés.</p>
+        )}
         {clientOccupant ? (
           <div className="chambres__occupant">
             <strong>{clientOccupant.client ? `${clientOccupant.client.prenom} ${clientOccupant.client.nom}` : 'Client'}</strong>
@@ -565,6 +574,21 @@ export default function RoomPage() {
             </Button>
           ))}
         </div>
+      </Modal>
+
+      <Modal
+        ouvert={modale === 'supprimer-chambre'}
+        onFermer={fermer}
+        titre={`Supprimer la chambre ${selection?.numero ?? ''} ?`}
+        description="Cette action est définitive. Les chambres liées à une réservation ou à une demande ne peuvent pas être supprimées."
+        libelleValider="Supprimer définitivement"
+        onValider={() => selection && executer(
+          () => window.electronAPI.remove('chambre', selection.id),
+          `Chambre ${selection.numero} supprimée.`
+        )}
+        chargement={chargement}
+      >
+        <p>La chambre {selection?.numero ?? ''} sera retirée de l’inventaire de l’hôtel. Si elle est encore référencée par une demande, Hypnos refusera la suppression sans effacer les données liées.</p>
       </Modal>
 
       <SuccessToast ouvert={Boolean(succes)} message={succes} onFermer={() => setSucces('')} />

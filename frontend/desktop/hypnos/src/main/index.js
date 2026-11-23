@@ -70,6 +70,11 @@ async function verifierMotDePasse(motDePasse, stocke) {
   const calcule = await scrypt(motDePasse, Buffer.from(selHex, 'hex'), attendu.length)
   return calcule.length === attendu.length && timingSafeEqual(calcule, attendu)
 }
+function genererCodeSecours() {
+  const brut = randomBytes(12).toString('hex').toUpperCase()
+  return brut.match(/.{1,4}/g).join('-')
+}
+const normaliserCodeSecours = (code) => String(code ?? '').replace(/[^a-f0-9]/gi, '').toLowerCase()
 
 // Supprime le menu global (File, Edit, View...) de toutes les fenêtres
 Menu.setApplicationMenu(null)
@@ -337,6 +342,7 @@ async function initialiserBase() {
     await ajouterColonnes('hotel', [
       ['statut_chambre_apres_depart', "TEXT NOT NULL DEFAULT 'nettoyage'"]
     ])
+    await ajouterColonnes('user', [['recovery_code_hash', 'TEXT']])
   }
 
   // Après les migrations, car elles manipulent cette option.
@@ -726,7 +732,7 @@ const TABLES = {
   demande: { table: demande },
   reservation: { table: reservation, avantEcriture: verifierDisponibilite },
   hotel: { table: hotel, avantEcriture: verifierHotel },
-  utilisateur: { table: user, secrets: ['passwordHash'] },
+  utilisateur: { table: user, secrets: ['passwordHash', 'recoveryCodeHash'] },
   service: { table: service },
   consommation: { table: consommation },
   chambre: { table: chambre, avantEcriture: verifierTypeChambre },
@@ -783,8 +789,37 @@ for (const [canal, { table, avantEcriture, secrets = [], ajoutSeul = false }] of
   })
 
   enregistrer(`${canal}:delete`, async (id) => {
-    await db.delete(table).where(eq(table.id, Number(id)))
-    return { success: true }
+    if (canal !== 'chambre') {
+      await db.delete(table).where(eq(table.id, Number(id)))
+      return { success: true }
+    }
+
+    const chambreId = Number(id)
+    const resultat = await db.transaction(async (tx) => {
+      const [existante] = await tx.select().from(chambre).where(eq(chambre.id, chambreId))
+      if (!existante) throw new ErreurMetier('Chambre introuvable.')
+      const reservationsLiees = await tx.select({ id: reservation.id }).from(reservation).where(eq(reservation.chambreId, chambreId)).limit(1)
+      if (reservationsLiees.length) {
+        throw new ErreurMetier('Suppression impossible : cette chambre est liée à une réservation. Conservez-la pour préserver l’historique et la caisse.')
+      }
+      const demandesLiees = await tx.select({ id: demande.id }).from(demande).where(eq(demande.chambreDemandeeId, chambreId)).limit(1)
+      if (demandesLiees.length) {
+        throw new ErreurMetier('Suppression impossible : cette chambre est demandée dans une réservation en ligne. Modifiez d’abord la demande.')
+      }
+      const [utilisateur] = session?.userId
+        ? await tx.select({ hotelId: user.hotelId }).from(user).where(eq(user.id, session.userId))
+        : []
+      const [hotelActif] = utilisateur
+        ? await tx.select().from(hotel).where(eq(hotel.id, utilisateur.hotelId))
+        : []
+      if (!hotelActif) throw new ErreurMetier('Hôtel de la session introuvable.')
+
+      await tx.delete(chambre).where(eq(chambre.id, chambreId))
+      await tx.update(hotel).set({ nombreChambres: Math.max(0, hotelActif.nombreChambres - 1) }).where(eq(hotel.id, hotelActif.id))
+      return { success: true }
+    })
+    await db.run(sql`PRAGMA foreign_keys = ON`)
+    return resultat
   })
 }
 
@@ -1010,6 +1045,8 @@ enregistrer(
     const identifiantExistant = await db.select({ id: user.id }).from(user).where(eq(user.username, p.username)).limit(1)
     if (identifiantExistant.length) throw new ErreurMetier('Ce nom d’utilisateur est déjà utilisé.')
     const empreinte = await hacherMotDePasse(p.motDePasse)
+    const codeSecours = genererCodeSecours()
+    const empreinteCodeSecours = await hacherMotDePasse(normaliserCodeSecours(codeSecours))
     const niveaux = p.etagesHauts + 1 // rez-de-chaussée compris
     const plan = planChambres(p.etagesHauts, p.chambresParEtage, p.chambresRez)
 
@@ -1052,7 +1089,8 @@ enregistrer(
           firstName: p.prenom,
           lastName: p.nomFamille,
           role: 'administrateur',
-          passwordHash: empreinte
+          passwordHash: empreinte,
+          recoveryCodeHash: empreinteCodeSecours
         })
         .returning()
       return u
@@ -1062,7 +1100,7 @@ enregistrer(
     await db.run(sql`PRAGMA foreign_keys = ON`)
 
     session = { userId: admin.id }
-    return utilisateurPublic(admin)
+    return { ...utilisateurPublic(admin), recoveryCode: codeSecours }
   },
   () => [setupWindow]
 )
@@ -1082,6 +1120,76 @@ enregistrer(
     }
     session = { userId: u.id }
     return utilisateurPublic(u)
+  },
+  () => [loginWindow]
+)
+
+enregistrer('auth:changerAcces', async (motDePasseActuel, nouvelIdentifiant, nouveauMotDePasse = '') => {
+  if (!session) throw new ErreurMetier('Session expirée : reconnectez-vous.')
+  const [compte] = await db.select().from(user).where(eq(user.id, session.userId))
+  if (!compte || !(await verifierMotDePasse(motDePasseActuel, compte.passwordHash))) {
+    throw new ErreurMetier('Le mot de passe actuel est incorrect.')
+  }
+  const username = String(nouvelIdentifiant ?? '').trim().toLowerCase()
+  if (!/^[a-z0-9._-]{3,30}$/.test(username)) {
+    throw new ErreurMetier('Le nom d’utilisateur doit compter 3 à 30 caractères (lettres, chiffres, point, tiret ou tiret bas).')
+  }
+  const existe = await db.select({ id: user.id }).from(user).where(eq(user.username, username)).limit(1)
+  if (existe.length && existe[0].id !== compte.id) throw new ErreurMetier('Ce nom d’utilisateur est déjà utilisé.')
+  const motDePasse = String(nouveauMotDePasse ?? '')
+  if (motDePasse && motDePasse.length < 8) throw new ErreurMetier('Le nouveau mot de passe doit contenir au moins 8 caractères.')
+  const passwordHash = motDePasse ? await hacherMotDePasse(motDePasse) : compte.passwordHash
+  const [maj] = await db.update(user).set({ username, passwordHash }).where(eq(user.id, compte.id)).returning()
+  return utilisateurPublic(maj)
+})
+
+enregistrer('auth:genererCodeSecours', async (motDePasseActuel) => {
+  if (!session) throw new ErreurMetier('Session expirée : reconnectez-vous.')
+  const [compte] = await db.select().from(user).where(eq(user.id, session.userId))
+  if (!compte || !(await verifierMotDePasse(motDePasseActuel, compte.passwordHash))) {
+    throw new ErreurMetier('Le mot de passe actuel est incorrect.')
+  }
+  const recoveryCode = genererCodeSecours()
+  const recoveryCodeHash = await hacherMotDePasse(normaliserCodeSecours(recoveryCode))
+  await db.update(user).set({ recoveryCodeHash }).where(eq(user.id, compte.id))
+  return { recoveryCode }
+})
+
+enregistrer(
+  'auth:recupererAcces',
+  async (code, nouvelIdentifiant, nouveauMotDePasse) => {
+    const codeNormalise = normaliserCodeSecours(code)
+    const username = String(nouvelIdentifiant ?? '').trim().toLowerCase()
+    const motDePasse = String(nouveauMotDePasse ?? '')
+    if (!codeNormalise || !username || !motDePasse) {
+      throw new ErreurMetier('Renseignez le code de secours, le nom d’utilisateur souhaité et un nouveau mot de passe.')
+    }
+    if (!/^[a-z0-9._-]{3,30}$/.test(username)) {
+      throw new ErreurMetier('Le nom d’utilisateur doit compter 3 à 30 caractères (lettres, chiffres, point, tiret ou tiret bas).')
+    }
+    if (motDePasse.length < 8) throw new ErreurMetier('Le nouveau mot de passe doit contenir au moins 8 caractères.')
+    const comptes = await db.select().from(user)
+    let compte = null
+    for (const candidat of comptes) {
+      if (candidat.recoveryCodeHash && await verifierMotDePasse(codeNormalise, candidat.recoveryCodeHash)) {
+        compte = candidat
+        break
+      }
+    }
+    if (!compte || !compte.isActive) {
+      await new Promise((resolve) => setTimeout(resolve, 700))
+      throw new ErreurMetier('Code de secours invalide ou déjà utilisé.')
+    }
+    const existe = await db.select({ id: user.id }).from(user).where(eq(user.username, username)).limit(1)
+    if (existe.length && existe[0].id !== compte.id) throw new ErreurMetier('Ce nom d’utilisateur est déjà utilisé.')
+    const recoveryCode = genererCodeSecours()
+    const [maj] = await db.update(user).set({
+      username,
+      passwordHash: await hacherMotDePasse(motDePasse),
+      recoveryCodeHash: await hacherMotDePasse(normaliserCodeSecours(recoveryCode))
+    }).where(eq(user.id, compte.id)).returning()
+    session = { userId: maj.id }
+    return { utilisateur: utilisateurPublic(maj), recoveryCode }
   },
   () => [loginWindow]
 )

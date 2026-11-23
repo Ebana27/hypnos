@@ -60,6 +60,7 @@ urlpatterns = [
     path('api/', include('hotels.urls')),
     path('api/', include('main.urls')),
     path('api/', include('reservations.urls')),
+    path('api/payments/kpay/', include('payments.urls')),
     # Synchronisation : file d'attente des demandes, propositions de chambres
     # et validation par l'agent. Le perimetre (demandes / reservations) est
     # explique dans sync/urls.py.

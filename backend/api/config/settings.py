@@ -112,6 +112,7 @@ INSTALLED_APPS = [
     "reservations",
     "sync",
     "main",
+    "payments",
     
     # --- pip install djangorestframework ---
     "rest_framework",
@@ -407,6 +408,24 @@ EMAIL_BACKEND = config(
 )
 
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="no-reply@hypnos.local")
+
+
+"""
+KPAY-NOW
+--------
+Les clés sont lues depuis l'environnement; aucune valeur sensible ne doit
+être ajoutée au dépôt. Les clés live sont refusées tant que l'activation
+explicite KPAY_ALLOW_LIVE_PAYMENTS=1 n'est pas donnée.
+"""
+
+KPAY_API_KEY = config("KPAY_API_KEY", default="")
+KPAY_SECRET_KEY = config("KPAY_SECRET_KEY", default="")
+KPAY_WEBHOOK_SECRET = config("KPAY_WEBHOOK_SECRET", default="")
+KPAY_GATEWAY_SECRET = config("KPAY_GATEWAY_SECRET", default="")
+KPAY_BASE_URL = config("KPAY_BASE_URL", default="https://admin.kpay.site")
+KPAY_PUBLIC_BASE_URL = config("KPAY_PUBLIC_BASE_URL", default="")
+KPAY_ALLOW_LIVE_PAYMENTS = config("KPAY_ALLOW_LIVE_PAYMENTS", default=False, cast=bool)
+KPAY_TIMEOUT_SECONDS = config("KPAY_TIMEOUT_SECONDS", default=15, cast=int)
 
 
 """

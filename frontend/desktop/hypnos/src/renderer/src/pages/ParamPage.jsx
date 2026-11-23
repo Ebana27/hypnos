@@ -28,6 +28,7 @@ const STYLES = `
 .param__grille { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
 .param__choix-fin { max-width:360px; }
 .param__pied { display:flex; justify-content:flex-end; }
+.param__code { display:block; padding:14px; border:1px solid var(--color-border); border-radius:var(--radius-m); background:var(--color-background-soft); font:700 18px/1.5 monospace; letter-spacing:.08em; text-align:center; user-select:all; overflow-wrap:anywhere; }
 @media (max-width:640px) { .param__themes, .param__grille { grid-template-columns:1fr; } }
 `
 injecterStyles('hypnos-page-param', STYLES)
@@ -45,6 +46,11 @@ const heureCourte = (h) => String(h ?? '').slice(0, 5)
 export default function ParamPage() {
   const [theme, setTheme] = useState('system')
   const [hotelId, setHotelId] = useState(null)
+  const [compte, setCompte] = useState(null)
+  const [identifiant, setIdentifiant] = useState('')
+  const [motDePasseActuel, setMotDePasseActuel] = useState('')
+  const [nouveauMotDePasse, setNouveauMotDePasse] = useState('')
+  const [codeSecours, setCodeSecours] = useState('')
   const [form, setForm] = useState({
     arrivee: '15:00',
     depart: '11:00',
@@ -61,6 +67,8 @@ export default function ParamPage() {
       const api = window.electronAPI
       const [themeActuel, session] = await Promise.all([api.apparence.obtenir(), api.sessionCourante()])
       setTheme(themeActuel)
+      setCompte(session?.utilisateur ?? null)
+      setIdentifiant(session?.utilisateur?.username ?? '')
       if (!session?.hotel) return
       const h = await api.getById('hotel', session.hotel.id)
       setHotelId(h.id)
@@ -124,6 +132,38 @@ export default function ParamPage() {
     }
   }
 
+  async function enregistrerAcces() {
+    if (!motDePasseActuel) return setEchec('Saisissez votre mot de passe actuel pour confirmer le changement.')
+    setChargement(true)
+    try {
+      const utilisateur = await window.electronAPI.changerAcces(motDePasseActuel, identifiant, nouveauMotDePasse)
+      setCompte(utilisateur)
+      setIdentifiant(utilisateur.username)
+      setMotDePasseActuel('')
+      setNouveauMotDePasse('')
+      setSucces('Identifiants mis à jour.')
+    } catch (e) {
+      setEchec(e.message)
+    } finally {
+      setChargement(false)
+    }
+  }
+
+  async function creerCodeSecours() {
+    if (!motDePasseActuel) return setEchec('Saisissez votre mot de passe actuel pour générer un code.')
+    setChargement(true)
+    try {
+      const resultat = await window.electronAPI.genererCodeSecours(motDePasseActuel)
+      setCodeSecours(resultat.recoveryCode)
+      setMotDePasseActuel('')
+      setSucces('Nouveau code de secours créé. Il remplace l’ancien.')
+    } catch (e) {
+      setEchec(e.message)
+    } finally {
+      setChargement(false)
+    }
+  }
+
   const maj = (champ) => (e) => setForm((f) => ({ ...f, [champ]: e.target.value }))
 
   return (
@@ -172,6 +212,24 @@ export default function ParamPage() {
         ) : (
           <p className="param__texte">Chargement des informations de l’hôtel…</p>
         )}
+      </div>
+
+      <div className="param__carte">
+        <h2 className="param__titre">Compte et accès</h2>
+        <p className="param__texte">Corrigez un nom d’utilisateur mal saisi ou changez le mot de passe. Pour ces opérations, votre mot de passe actuel est demandé.</p>
+        {compte ? (
+          <>
+            <div className="param__grille">
+              <Input label="Nom d’utilisateur" requis autoComplete="username" value={identifiant} onChange={(e) => setIdentifiant(e.target.value)} />
+              <Input label="Mot de passe actuel" type="password" autoComplete="current-password" value={motDePasseActuel} onChange={(e) => setMotDePasseActuel(e.target.value)} />
+              <Input label="Nouveau mot de passe (facultatif)" type="password" autoComplete="new-password" aide="8 caractères minimum. Laissez vide pour ne changer que le nom d’utilisateur." value={nouveauMotDePasse} onChange={(e) => setNouveauMotDePasse(e.target.value)} />
+            </div>
+            <div className="param__pied"><Button chargement={chargement} disabled={!motDePasseActuel || !identifiant.trim()} onClick={enregistrerAcces}>Mettre à jour l’accès</Button></div>
+            <p className="param__texte">Code de secours : à générer et conserver hors de cet ordinateur. La récupération remplace ce code après son utilisation.</p>
+            <div className="param__pied"><Button variante="secondaire" chargement={chargement} disabled={!motDePasseActuel} onClick={creerCodeSecours}>Générer / remplacer le code de secours</Button></div>
+            {codeSecours && <><output className="param__code" aria-label="Code de secours">{codeSecours}</output><div className="param__pied"><Button variante="fantome" onClick={async () => { try { await navigator.clipboard.writeText(codeSecours) } catch { /* le code reste sélectionnable */ } }}>Copier le code</Button></div></>}
+          </>
+        ) : <p className="param__texte">Chargement du compte…</p>}
       </div>
 
       <SuccessToast ouvert={Boolean(succes)} message={succes} onFermer={() => setSucces('')} />

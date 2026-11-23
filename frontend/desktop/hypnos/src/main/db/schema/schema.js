@@ -53,6 +53,7 @@ export const user = sqliteTable('user', {
     .references(() => hotel.id, { onDelete: 'restrict' }),
   username: text('username', { length: 150 }).notNull().unique(),
   passwordHash: text('password_hash').notNull().default(''),
+  recoveryCodeHash: text('recovery_code_hash'),
   email: text('email', { length: 255 }).notNull().unique(),
   firstName: text('first_name', { length: 150 }).notNull().default(''),
   lastName: text('last_name', { length: 150 }).notNull().default(''),

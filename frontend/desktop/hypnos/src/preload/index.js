@@ -47,6 +47,11 @@ const api = {
 
   // -------- Accès --------
   connexion: (identifiant, motDePasse) => appeler('auth:connexion', identifiant, motDePasse),
+  changerAcces: (motDePasseActuel, nouvelIdentifiant, nouveauMotDePasse) =>
+    appeler('auth:changerAcces', motDePasseActuel, nouvelIdentifiant, nouveauMotDePasse),
+  genererCodeSecours: (motDePasseActuel) => appeler('auth:genererCodeSecours', motDePasseActuel),
+  recupererAcces: (code, nouvelIdentifiant, nouveauMotDePasse) =>
+    appeler('auth:recupererAcces', code, nouvelIdentifiant, nouveauMotDePasse),
   creerHotel: (donnees) => appeler('hotel:creerComplet', donnees),
   sessionCourante: () => appeler('session:courante'),
 
