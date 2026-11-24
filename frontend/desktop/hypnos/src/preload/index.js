@@ -55,6 +55,16 @@ const api = {
   creerHotel: (donnees) => appeler('hotel:creerComplet', donnees),
   sessionCourante: () => appeler('session:courante'),
 
+  // -------- Connexion au backend Django / KPay --------
+  kpay: {
+    configuration: () => appeler('kpay:configuration'),
+    connexion: (url, username, password) => appeler('kpay:connexion', url, username, password),
+    deconnexion: () => appeler('kpay:deconnexion'),
+    initier: (reservationId, montant, mode, numero) =>
+      appeler('kpay:initier', reservationId, montant, mode, numero),
+    statut: (reservationId, externalId) => appeler('kpay:statut', reservationId, externalId)
+  },
+
   // -------- Mises à jour --------
   // États possibles : aucune | verification | disponible | telechargement | prete | erreur
   maj: {

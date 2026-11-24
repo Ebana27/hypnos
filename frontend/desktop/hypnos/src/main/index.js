@@ -22,6 +22,7 @@ import {
   typeDeChambre,
   user
 } from './db/schema/schema.js'
+import { montantPayeEffectif, totaux } from '../renderer/src/lib/reservations.js'
 
 // electron-updater n'est PAS importé ici : il est chargé à la demande (voir chargerUpdater),
 // uniquement dans l'application installée, pour ne pas ralentir le démarrage.
@@ -337,7 +338,12 @@ async function initialiserBase() {
       ['demandes_speciales', "TEXT NOT NULL DEFAULT ''"],
       ['conditions_paiement', "TEXT NOT NULL DEFAULT ''"],
       ['mode_paiement', "TEXT NOT NULL DEFAULT 'especes'"],
-      ['numero_paiement', "TEXT NOT NULL DEFAULT ''"]
+      ['numero_paiement', "TEXT NOT NULL DEFAULT ''"],
+      ['kpay_external_id', 'TEXT'],
+      ['kpay_status', 'TEXT'],
+      ['kpay_mode', 'TEXT'],
+      ['kpay_amount', 'INTEGER'],
+      ['kpay_recorded', 'INTEGER NOT NULL DEFAULT 0']
     ])
     await ajouterColonnes('hotel', [
       ['statut_chambre_apres_depart', "TEXT NOT NULL DEFAULT 'nettoyage'"]
@@ -424,6 +430,253 @@ function enregistrer(canal, action, autorisees = depuisPrincipale) {
   })
 }
 
+// La connexion Django est distincte du compte local Hypnos. Le mot de passe et les JWT
+// restent uniquement en mémoire du processus principal; seule l'URL publique est persistée.
+let kpaySession = null
+const fichierConfigurationKpay = () => join(app.getPath('userData'), 'kpay-api.json')
+
+function normaliserUrlApi(valeur) {
+  let url
+  try {
+    url = new URL(String(valeur ?? '').trim())
+  } catch {
+    throw new ErreurMetier('Saisissez l’URL HTTPS publique de l’API Django (ngrok), sans chemin.')
+  }
+  const local = ['localhost', '127.0.0.1', '::1'].includes(url.hostname)
+  const origineNgrok = ['.ngrok-free.dev', '.ngrok-free.app', '.ngrok.io'].some((suffixe) => url.hostname.endsWith(suffixe))
+  if ((url.protocol !== 'https:' && !(local && url.protocol === 'http:')) || url.username || url.password) {
+    throw new ErreurMetier('L’API doit utiliser HTTPS. HTTP est autorisé uniquement pour localhost.')
+  }
+  if (!local && !origineNgrok) throw new ErreurMetier('Pour les essais, utilisez votre domaine ngrok HTTPS; les autres hôtes ne sont pas autorisés à recevoir vos identifiants.')
+  if (url.pathname !== '/' || url.search || url.hash) {
+    throw new ErreurMetier('Saisissez uniquement l’origine de l’API, par exemple https://xxxx.ngrok-free.dev.')
+  }
+  return url.origin
+}
+
+async function lireConfigurationKpay() {
+  try {
+    const valeur = JSON.parse(await fs.promises.readFile(fichierConfigurationKpay(), 'utf8'))
+    return { baseUrl: normaliserUrlApi(valeur.baseUrl) }
+  } catch {
+    return { baseUrl: '' }
+  }
+}
+
+async function sauverConfigurationKpay(baseUrl) {
+  await fs.promises.mkdir(app.getPath('userData'), { recursive: true })
+  await fs.promises.writeFile(fichierConfigurationKpay(), JSON.stringify({ baseUrl }), { mode: 0o600 })
+}
+
+async function reponseJsonApi(reponse) {
+  let donnees
+  try {
+    donnees = await reponse.json()
+  } catch {
+    throw new ErreurMetier(`Réponse illisible de l’API Django (HTTP ${reponse.status}).`)
+  }
+  if (!reponse.ok) {
+    const detail = donnees?.detail || Object.entries(donnees ?? {}).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' · ')
+    const erreur = new ErreurMetier(detail || `Erreur API Django (HTTP ${reponse.status}).`)
+    erreur.httpStatus = reponse.status
+    throw erreur
+  }
+  return donnees
+}
+
+async function resteReservation(tx, r) {
+  const [ch] = await tx.select().from(chambre).where(eq(chambre.id, r.chambreId))
+  const [type] = ch ? await tx.select().from(typeDeChambre).where(eq(typeDeChambre.id, ch.typeId)) : []
+  const consommations = await tx.select().from(consommation).where(eq(consommation.reservationId, r.id))
+  const mouvements = await tx.select().from(mouvementCaisse).where(eq(mouvementCaisse.reservationId, r.id))
+  const paye = montantPayeEffectif(r, mouvements)
+  return totaux({ ...r, montantPaye: paye }, type?.prix ?? 0, consommations).reste
+}
+
+async function rafraichirJwtKpay() {
+  if (!kpaySession?.refresh) throw new ErreurMetier('Connectez-vous à l’API Django dans Paramètres > KPay.')
+  const reponse = await fetch(`${kpaySession.baseUrl}/api/token/refresh/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh: kpaySession.refresh })
+  })
+  const donnees = await reponseJsonApi(reponse)
+  kpaySession.access = donnees.access
+  if (donnees.refresh) kpaySession.refresh = donnees.refresh
+  kpaySession.expire = Date.now() + 55 * 60 * 1000
+}
+
+async function appelerApiKpay(route, options = {}) {
+  if (!kpaySession) throw new ErreurMetier('Connectez-vous à l’API Django dans Paramètres > KPay.')
+  if (Date.now() >= kpaySession.expire) await rafraichirJwtKpay()
+  const requete = () => fetch(`${kpaySession.baseUrl}${route}`, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${kpaySession.access}`, ...options.headers }
+  })
+  let reponse = await requete()
+  if (reponse.status === 401) {
+    await rafraichirJwtKpay()
+    reponse = await requete()
+  }
+  return reponseJsonApi(reponse)
+}
+
+enregistrer('kpay:configuration', async () => ({ ...(await lireConfigurationKpay()), connected: Boolean(kpaySession) }))
+enregistrer('kpay:connexion', async (urlSaisie, username, password) => {
+  const baseUrl = normaliserUrlApi(urlSaisie)
+  if (!String(username ?? '').trim() || !String(password ?? '')) throw new ErreurMetier('Saisissez le nom d’utilisateur et le mot de passe Django.')
+  let reponse
+  try {
+    reponse = await fetch(`${baseUrl}/api/token/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: String(username).trim(), password: String(password) })
+    })
+  } catch {
+    throw new ErreurMetier('API Django inaccessible. Vérifiez que Django et ngrok sont démarrés et que l’URL ngrok est actuelle.')
+  }
+  const tokens = await reponseJsonApi(reponse)
+  if (!tokens.access || !tokens.refresh) throw new ErreurMetier('L’API Django n’a pas renvoyé les deux jetons JWT attendus.')
+  kpaySession = { baseUrl, access: tokens.access, refresh: tokens.refresh, expire: Date.now() + 55 * 60 * 1000 }
+  await sauverConfigurationKpay(baseUrl)
+  return { connected: true, baseUrl }
+})
+enregistrer('kpay:deconnexion', async () => {
+  kpaySession = null
+  return { connected: false }
+})
+
+const verrousInitialisationKpay = new Set()
+enregistrer('kpay:initier', async (...args) => {
+  const id = Number(args[0])
+  if (verrousInitialisationKpay.has(id)) throw new ErreurMetier('Une demande de paiement est déjà en cours pour cette réservation.')
+  verrousInitialisationKpay.add(id)
+  try {
+    return await initialiserPaiementKpay(...args)
+  } finally {
+    verrousInitialisationKpay.delete(id)
+  }
+})
+
+async function initialiserPaiementKpay(reservationId, montantValeur, mode, numero) {
+  const id = Number(reservationId)
+  const montant = Number(montantValeur)
+  if (!session) throw new ErreurMetier('Session Hypnos expirée : reconnectez-vous.')
+  if (!Number.isInteger(id) || id < 1 || !Number.isInteger(montant) || montant < 1) throw new ErreurMetier('Réservation ou montant KPay invalide.')
+  if (!['mtn_money', 'airtel_money'].includes(mode)) throw new ErreurMetier('Choisissez MTN Money ou Airtel Money.')
+  const chiffresNumero = String(numero ?? '').replace(/\D/g, '')
+  const national = chiffresNumero.startsWith('242') ? chiffresNumero.slice(3) : chiffresNumero
+  if (national.length !== 9) throw new ErreurMetier('Pour le Congo, saisissez +242 suivi des 9 chiffres du numéro Mobile Money.')
+  const [r] = await db.select().from(reservation).where(eq(reservation.id, id))
+  if (!r || r.statut === 'annulee') throw new ErreurMetier('Réservation introuvable ou annulée.')
+  if (r.kpayExternalId && !r.kpayRecorded && ['CREATED', 'PENDING', 'PROCESSING', 'INITIATION_UNKNOWN'].includes(r.kpayStatus)) {
+    throw new ErreurMetier(`Un paiement KPay est déjà ${r.kpayStatus === 'INITIATION_UNKNOWN' ? 'en vérification' : 'en cours'} (${r.kpayExternalId}). Vérifiez son statut avant d’en lancer un autre.`)
+  }
+  const reste = await resteReservation(db, r)
+  if (montant > reste) throw new ErreurMetier(`Le montant dépasse le solde de la réservation (${Math.max(0, reste)} XAF).`)
+  const externalId = `HYP-${id}-${Date.now()}-${randomBytes(5).toString('hex')}`
+  const provider = mode === 'mtn_money' ? 'MTN_MOMO_COG' : 'AIRTEL_COG'
+  const [clientReservation] = await db.select().from(client).where(eq(client.id, r.clientId))
+  await db.update(reservation).set({
+    kpayExternalId: externalId,
+    kpayStatus: 'INITIATION_UNKNOWN',
+    kpayMode: mode,
+    kpayAmount: montant,
+    kpayRecorded: false
+  }).where(eq(reservation.id, id))
+  const payload = {
+    mode: 'USSD', amount: montant, currency: 'XAF', externalId, provider,
+    phoneNumber: `+242${national}`,
+    description: `Hypnos réservation ${id}`,
+    customerName: clientReservation ? `${clientReservation.prenom} ${clientReservation.nom}`.trim() : '',
+    customerEmail: clientReservation?.email || undefined,
+    metadata: { desktopReservationId: id }
+  }
+  let resultat
+  try {
+    resultat = await appelerApiKpay('/api/payments/kpay/init/', { method: 'POST', body: JSON.stringify(payload) })
+  } catch (erreur) {
+    if ([400, 401, 403, 409, 422].includes(erreur.httpStatus)) {
+      await db.update(reservation).set({ kpayStatus: 'FAILED' }).where(eq(reservation.id, id))
+    }
+    throw erreur
+  }
+  if (resultat.isTest !== true) throw new ErreurMetier('KPay n’a pas confirmé le mode sandbox. Le paiement n’est pas enregistré dans la caisse; vérifiez son statut auprès du backend avant tout nouvel essai.')
+  if (resultat.externalId !== externalId || Number(resultat.amount) !== montant || resultat.currency !== 'XAF' || !resultat.status) {
+    throw new ErreurMetier('La réponse KPay ne correspond pas à la demande (référence, montant ou devise). Vérifiez le statut avant toute nouvelle tentative.')
+  }
+  await db.update(reservation).set({
+    kpayExternalId: externalId,
+    kpayStatus: resultat.status ?? 'INITIATION_UNKNOWN',
+    kpayMode: mode,
+    kpayAmount: montant,
+    kpayRecorded: false
+  }).where(eq(reservation.id, id))
+  return { externalId, status: resultat.status, isTest: resultat.isTest, amount: resultat.amount, currency: resultat.currency }
+}
+
+const verrousVerificationKpay = new Set()
+enregistrer('kpay:statut', async (reservationId, externalId) => {
+  const id = Number(reservationId)
+  const cle = `${id}:${externalId}`
+  if (verrousVerificationKpay.has(cle)) throw new ErreurMetier('La vérification de ce paiement est déjà en cours.')
+  verrousVerificationKpay.add(cle)
+  try {
+    return await consulterStatutKpay(id, externalId)
+  } finally {
+    verrousVerificationKpay.delete(cle)
+  }
+})
+
+async function consulterStatutKpay(reservationId, externalId) {
+  if (!session) throw new ErreurMetier('Session Hypnos expirée : reconnectez-vous avant de vérifier un paiement.')
+  const id = Number(reservationId)
+  const [r] = await db.select().from(reservation).where(eq(reservation.id, id))
+  if (!r || r.kpayExternalId !== externalId || !externalId) throw new ErreurMetier('Ce paiement KPay ne correspond pas à cette réservation.')
+  let resultat
+  try {
+    resultat = await appelerApiKpay(`/api/payments/kpay/status/${encodeURIComponent(externalId)}/`)
+  } catch (erreur) {
+    if (erreur.httpStatus === 404) {
+      await db.update(reservation).set({ kpayStatus: 'FAILED' }).where(eq(reservation.id, id))
+      throw new ErreurMetier('Le backend ne connaît pas cette demande. Elle peut être relancée; aucun paiement n’a été comptabilisé.')
+    }
+    throw erreur
+  }
+  if (resultat.isTest !== true) throw new ErreurMetier('Le backend n’a pas confirmé que ce paiement est sandbox; aucun reçu local n’a été créé.')
+  if (resultat.externalId !== externalId || Number(resultat.amount) !== Number(r.kpayAmount) || resultat.currency !== 'XAF') {
+    throw new ErreurMetier('La réponse de statut KPay ne correspond pas à la référence, au montant ou à la devise attendus; aucun reçu local n’a été créé.')
+  }
+  await db.transaction(async (tx) => {
+    const [courante] = await tx.select().from(reservation).where(eq(reservation.id, id))
+    if (!courante || courante.kpayExternalId !== externalId) throw new ErreurMetier('La réservation a changé pendant la vérification du paiement.')
+    if (resultat.status === 'COMPLETED' && !courante.kpayRecorded) {
+      const montant = Number(courante.kpayAmount)
+      if (!Number.isInteger(montant) || montant < 1 || Number(resultat.amount) !== montant) throw new ErreurMetier('Le montant confirmé par KPay ne correspond pas au montant attendu; aucun mouvement de caisse n’a été ajouté.')
+      const reste = await resteReservation(tx, courante)
+      if (montant > reste) throw new ErreurMetier('KPay confirme le paiement, mais le solde local a changé entre-temps. Aucun mouvement n’a été ajouté; rapprochez le paiement manuellement.')
+      await tx.update(reservation).set({
+        montantPaye: courante.montantPaye + montant,
+        kpayStatus: resultat.status,
+        kpayRecorded: true
+      }).where(eq(reservation.id, id))
+      await tx.insert(mouvementCaisse).values({
+        type: 'entree',
+        categorie: courante.statut === 'confirmee' ? 'acompte' : 'paiement_client',
+        montant,
+        modePaiement: courante.kpayMode,
+        reservationId: id,
+        motif: `KPay ${externalId}`,
+        dateMouvement: jourLocal(),
+        createdBy: session.userId
+      })
+    } else {
+      await tx.update(reservation).set({ kpayStatus: resultat.status }).where(eq(reservation.id, id))
+    }
+  })
+  return { externalId, status: resultat.status, amount: resultat.amount, recorded: resultat.status === 'COMPLETED' }
+}
+
 // Ne garde que les colonnes réelles de la table, sans les champs protégés
 function filtrerChamps(table, data, interdits) {
   const colonnes = Object.keys(getTableColumns(table))
@@ -436,8 +689,8 @@ function filtrerChamps(table, data, interdits) {
   return propre
 }
 
-const INTERDITS_CREATION = ['id', 'createdAt', 'updatedAt']
-const INTERDITS_MISE_A_JOUR = ['id', 'createdAt', 'updatedAt', 'remoteId', 'createdBy']
+const INTERDITS_CREATION = ['id', 'createdAt', 'updatedAt', 'kpayExternalId', 'kpayStatus', 'kpayMode', 'kpayAmount', 'kpayRecorded']
+const INTERDITS_MISE_A_JOUR = ['id', 'createdAt', 'updatedAt', 'remoteId', 'createdBy', 'kpayExternalId', 'kpayStatus', 'kpayMode', 'kpayAmount', 'kpayRecorded']
 
 // ============================================================
 //  RÈGLES PAR TABLE (exécutées avant création / mise à jour)
@@ -833,6 +1086,7 @@ enregistrer('reservation:encaisser', async (id, donnees) => {
   const montant = Number(donnees?.montant)
   const nature = donnees?.nature ?? 'paiement_client'
   if (!session) throw new ErreurMetier('Session expirée : reconnectez-vous.')
+  if (verrousInitialisationKpay.has(Number(id))) throw new ErreurMetier('Une initiation KPay est en cours. Attendez son résultat avant tout autre encaissement.')
   if (!Number.isInteger(montant) || montant <= 0) throw new ErreurMetier('Saisissez un montant supérieur à 0.')
   if (!MODES_PAIEMENT.includes(donnees?.mode)) throw new ErreurMetier('Choisissez le mode de paiement.')
   if (!['acompte', 'paiement_client'].includes(nature)) throw new ErreurMetier('Nature de paiement invalide.')
@@ -841,6 +1095,9 @@ enregistrer('reservation:encaisser', async (id, donnees) => {
     const [r] = await tx.select().from(reservation).where(eq(reservation.id, Number(id)))
     if (!r) throw new ErreurMetier('Réservation introuvable.')
     if (r.statut === 'annulee') throw new ErreurMetier('Cette réservation est annulée.')
+    if (r.kpayExternalId && !r.kpayRecorded && ['CREATED', 'PENDING', 'PROCESSING', 'INITIATION_UNKNOWN'].includes(r.kpayStatus)) {
+      throw new ErreurMetier('Un paiement KPay est encore en attente. Vérifiez son statut avant tout autre encaissement.')
+    }
     await tx.update(reservation).set({ montantPaye: r.montantPaye + montant }).where(eq(reservation.id, r.id))
     await tx.insert(mouvementCaisse).values({
       type: 'entree',
@@ -861,10 +1118,14 @@ enregistrer('reservation:encaisser', async (id, donnees) => {
 enregistrer('reservation:annuler', async (id, options) => {
   const rembourser = Boolean(options?.rembourser)
   if (!session) throw new ErreurMetier('Session expirée : reconnectez-vous.')
+  if (verrousInitialisationKpay.has(Number(id))) throw new ErreurMetier('Une initiation KPay est en cours. Attendez son résultat avant d’annuler la réservation.')
 
   const resultat = await db.transaction(async (tx) => {
     const [r] = await tx.select().from(reservation).where(eq(reservation.id, Number(id)))
     if (!r) throw new ErreurMetier('Réservation introuvable.')
+    if (r.kpayExternalId && !r.kpayRecorded && ['CREATED', 'PENDING', 'PROCESSING', 'INITIATION_UNKNOWN'].includes(r.kpayStatus)) {
+      throw new ErreurMetier('Un paiement KPay est encore en cours ou à vérifier. Contrôlez son statut avant d’annuler la réservation.')
+    }
     if (!['confirmee', 'en_attente'].includes(r.statut)) {
       throw new ErreurMetier('Seule une réservation non commencée peut être annulée.')
     }

@@ -51,6 +51,10 @@ export default function ParamPage() {
   const [motDePasseActuel, setMotDePasseActuel] = useState('')
   const [nouveauMotDePasse, setNouveauMotDePasse] = useState('')
   const [codeSecours, setCodeSecours] = useState('')
+  const [urlApi, setUrlApi] = useState('')
+  const [identifiantApi, setIdentifiantApi] = useState('')
+  const [motDePasseApi, setMotDePasseApi] = useState('')
+  const [apiConnectee, setApiConnectee] = useState(false)
   const [form, setForm] = useState({
     arrivee: '15:00',
     depart: '11:00',
@@ -88,6 +92,15 @@ export default function ParamPage() {
   useEffect(() => {
     charger()
   }, [charger])
+
+  useEffect(() => {
+    window.electronAPI.kpay.configuration()
+      .then((configuration) => {
+        setUrlApi(configuration.baseUrl ?? '')
+        setApiConnectee(Boolean(configuration.connected))
+      })
+      .catch((e) => setEchec(e.message))
+  }, [])
 
   async function choisirTheme(valeur) {
     const precedent = theme
@@ -164,6 +177,31 @@ export default function ParamPage() {
     }
   }
 
+  async function connecterApi() {
+    setChargement(true)
+    try {
+      const resultat = await window.electronAPI.kpay.connexion(urlApi, identifiantApi, motDePasseApi)
+      setUrlApi(resultat.baseUrl)
+      setMotDePasseApi('')
+      setApiConnectee(true)
+      setSucces('Connecté au backend Django. Le JWT reste en mémoire pendant cette session.')
+    } catch (e) {
+      setEchec(e.message)
+    } finally {
+      setChargement(false)
+    }
+  }
+
+  async function deconnecterApi() {
+    try {
+      await window.electronAPI.kpay.deconnexion()
+      setApiConnectee(false)
+      setSucces('Déconnecté du backend Django.')
+    } catch (e) {
+      setEchec(e.message)
+    }
+  }
+
   const maj = (champ) => (e) => setForm((f) => ({ ...f, [champ]: e.target.value }))
 
   return (
@@ -230,6 +268,25 @@ export default function ParamPage() {
             {codeSecours && <><output className="param__code" aria-label="Code de secours">{codeSecours}</output><div className="param__pied"><Button variante="fantome" onClick={async () => { try { await navigator.clipboard.writeText(codeSecours) } catch { /* le code reste sélectionnable */ } }}>Copier le code</Button></div></>}
           </>
         ) : <p className="param__texte">Chargement du compte…</p>}
+      </div>
+
+      <div className="param__carte">
+        <h2 className="param__titre">Backend Django et KPay</h2>
+        <p className="param__texte">
+          Connexion distincte du compte local Hypnos. Saisissez l’origine HTTPS ngrok de Django et un compte Django actif. Le mot de passe n’est pas conservé; les JWT restent en mémoire et seront redemandés au prochain démarrage.
+        </p>
+        <div className="param__grille">
+          <Input label="URL publique de l’API Django" type="url" placeholder="https://xxxx.ngrok-free.dev" value={urlApi} onChange={(e) => setUrlApi(e.target.value)} />
+          <Input label="Nom d’utilisateur Django" autoComplete="username" value={identifiantApi} onChange={(e) => setIdentifiantApi(e.target.value)} />
+          <Input label="Mot de passe Django" type="password" autoComplete="current-password" value={motDePasseApi} onChange={(e) => setMotDePasseApi(e.target.value)} />
+        </div>
+        <div className="param__pied">
+          {apiConnectee ? (
+            <Button variante="secondaire" onClick={deconnecterApi}>Déconnecter l’API</Button>
+          ) : (
+            <Button chargement={chargement} disabled={!urlApi.trim() || !identifiantApi.trim() || !motDePasseApi} onClick={connecterApi}>Se connecter à Django</Button>
+          )}
+        </div>
       </div>
 
       <SuccessToast ouvert={Boolean(succes)} message={succes} onFermer={() => setSucces('')} />

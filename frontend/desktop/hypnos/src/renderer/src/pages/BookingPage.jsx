@@ -450,6 +450,8 @@ const STYLES = `
   padding-top: 12px;
   border-top: 1px solid var(--color-border);
 }
+.fiche__kpay { display: grid; gap: 7px; padding: 10px; border: 1px solid var(--color-border); border-radius: var(--radius-s); background: var(--color-background-soft); font-size: 12px; }
+.fiche__kpay span { color: var(--color-text-muted); overflow-wrap: anywhere; }
 .detail-resa__pied {
   display: flex;
   flex-wrap: wrap;
@@ -517,6 +519,15 @@ const STYLES = `
 .resa-new__col, .resa-new__col *, .resa-new__grille > *, .resa-new__bas > * { min-width:0; box-sizing:border-box; }
 .resa-new__col input:not([type="checkbox"]):not([type="radio"]), .resa-new__col select, .resa-new__col textarea { width:100%; max-width:100%; min-width:0; box-sizing:border-box; }
 .resa-new__plein { grid-column: 1 / -1; }
+.resa-new__paiement-note {
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: var(--radius-s);
+  background: var(--color-background-soft);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
 .resa-new__etiquette {
   margin: 0;
   font-size: 11px;
@@ -1012,8 +1023,8 @@ function ModaleNouvelle({ prefill, modele, chargement, onFermer, onCreer, onErre
               onChange={(v) => setForm((f) => ({ ...f, modePaiement: v, modeAcompte: v }))}
             />
             {estMobileMoney(form.modePaiement) && (
-              <AideSurvol texte="Le numéro est conservé pour le paiement mobile. Le déclenchement nécessitera un prestataire connecté.">
-                <Input label="Numéro Mobile Money" type="tel" placeholder="+242 …" value={form.numeroPaiement} onChange={maj('numeroPaiement')} />
+              <AideSurvol texte="Le numéro est conservé pour le paiement mobile. Après confirmation, lancez la demande KPay depuis la fiche de réservation.">
+                <Input label="Numéro Mobile Money" type="tel" inputMode="tel" autoComplete="tel" placeholder="+242 …" value={form.numeroPaiement} onChange={maj('numeroPaiement')} />
               </AideSurvol>
             )}
             {form.modePaiement === 'carte' && (
@@ -1028,8 +1039,11 @@ function ModaleNouvelle({ prefill, modele, chargement, onFermer, onCreer, onErre
               { valeur: 'facturation_societe', libelle: 'Facturation entreprise / agence' }
             ]} /></AideSurvol>
             <Input label={`Acompte (${DEVISE}) · payé en ${LIBELLES_MODE[form.modePaiement]}`} type="number" min={0} value={form.acompte} onChange={maj('acompte')} />
-            {estMobileMoney(form.modePaiement) && <Button variante="secondaire" disabled title="Aucun prestataire marchand n’est encore connecté.">Déclencher le paiement — bientôt disponible</Button>}
-            <AideSurvol texte="Les moyens mobiles sont enregistrés comme choix prévu. Aucun débit réel n’est lancé sans intégration marchand." className="resa-new__aide-only" />
+            {estMobileMoney(form.modePaiement) && (
+              <p className="resa-new__paiement-note" role="status">
+                La création n’envoie pas la demande de paiement. Confirmez la réservation, connectez Django dans Paramètres, puis lancez KPay depuis sa fiche. L’acompte ne sera comptabilisé qu’après confirmation.
+              </p>
+            )}
           </section>
           <section className="resa-new__col resa-new__invoice" aria-label="Récapitulatif du séjour">
             <h3 className="resa-new__titre">Récapitulatif</h3>
@@ -1126,9 +1140,12 @@ function ModaleDetail({
   onFermer,
   onErreur,
   onEnregistrer,
+  onEnregistrerNumero,
   onAjouterConso,
   onRetirerConso,
   onEncaisser,
+  onKpayInitier,
+  onKpayVerifier,
   onChangerStatut,
   onFacture,
   facturationEnCours
@@ -1136,6 +1153,7 @@ function ModaleDetail({
   const [form, setForm] = useState({})
   const [montant, setMontant] = useState('')
   const [mode, setMode] = useState('especes')
+  const [numeroMobile, setNumeroMobile] = useState('')
   const [annulation, setAnnulation] = useState(false)
   const [departConfirm, setDepartConfirm] = useState(false)
   const [prixLibre, setPrixLibre] = useState({})
@@ -1155,9 +1173,11 @@ function ModaleDetail({
       regleArrondi: resa.regleArrondi ?? 'prorata',
       tarifApplique: String(resa.tarifApplique ?? 0)
     })
+    setMode(resa.modePaiement ?? 'especes')
+    setNumeroMobile(resa.numeroPaiement ?? '')
     setAnnulation(false)
     setDepartConfirm(false)
-  }, [resa.dateDebut, resa.dateFin, resa.canal, resa.nombreDePersonne, resa.nombreAdultes, resa.nombreEnfants, resa.statut, resa.typeSejour, resa.modeTarif, resa.regleArrondi, resa.tarifApplique])
+  }, [resa.dateDebut, resa.dateFin, resa.canal, resa.nombreDePersonne, resa.nombreAdultes, resa.nombreEnfants, resa.statut, resa.typeSejour, resa.modeTarif, resa.regleArrondi, resa.tarifApplique, resa.modePaiement, resa.numeroPaiement])
 
   // Le montant à encaisser suit le reste à payer (nouveau service, paiement reçu…)
   useEffect(() => {
@@ -1167,6 +1187,7 @@ function ModaleDetail({
   const modifiable = ['en_attente', 'confirmee', 'en_sejour'].includes(resa.statut)
   const arriveeModifiable = resa.statut === 'en_attente' || resa.statut === 'confirmee'
   const peutEncaisser = resa.statut !== 'annulee' && resa.reste > 0
+  const paiementKpayEnAttente = Boolean(resa.kpayExternalId && !resa.kpayRecorded && ['CREATED', 'PENDING', 'PROCESSING', 'INITIATION_UNKNOWN'].includes(resa.kpayStatus))
   const modifie =
     form.debut !== dateHeureLocale(resa.dateDebut, '15:00') ||
     form.fin !== dateHeureLocale(resa.dateFin, '11:00') ||
@@ -1208,7 +1229,30 @@ function ModaleDetail({
     const v = Number(montant)
     if (!(v > 0)) return onErreur('Saisissez un montant supérieur à 0.')
     if (v > resa.reste) return onErreur('Le montant dépasse le reste à payer.')
+    if (estMobileMoney(mode)) {
+      if (!numeroMobile.trim()) return onErreur('Saisissez le numéro Mobile Money du client.')
+      return onErreur('La sélection MTN/Airtel n’a pas lancé de paiement. Utilisez le bouton « Demander le paiement sur le téléphone » après connexion de Django dans Paramètres.')
+    }
     return onEncaisser(v, mode)
+  }
+
+  function enregistrerNumeroMobile() {
+    const numero = numeroMobile.trim()
+    if (!numero) return onErreur('Saisissez le numéro Mobile Money du client.')
+    if (!/^[+0-9() .-]{6,30}$/.test(numero)) return onErreur('Vérifiez le format du numéro Mobile Money.')
+    return onEnregistrerNumero(numero)
+  }
+
+  function initierPaiementKpay() {
+    const valeur = Number(montant)
+    if (!(valeur > 0)) return onErreur('Saisissez un montant supérieur à 0.')
+    if (valeur > resa.reste) return onErreur('Le montant dépasse le reste à payer.')
+    if (!numeroMobile.trim()) return onErreur('Saisissez le numéro Mobile Money du client.')
+    return onKpayInitier(valeur, mode, numeroMobile.trim())
+  }
+
+  function verifierPaiementKpay() {
+    return onKpayVerifier(resa.kpayExternalId)
   }
 
   return (
@@ -1475,6 +1519,25 @@ function ModaleDetail({
                   {resa.statut === 'confirmee' ? 'Encaisser un acompte' : 'Encaisser un paiement'}
                 </p>
                 <MethodesPaiement valeur={mode} onChange={setMode} />
+                {estMobileMoney(mode) && (
+                  <>
+                    <Input
+                      label="Numéro Mobile Money"
+                      type="tel"
+                      autoComplete="tel"
+                      inputMode="tel"
+                      placeholder="+242 …"
+                      value={numeroMobile}
+                      onChange={(e) => setNumeroMobile(e.target.value)}
+                    />
+                    <Button variante="secondaire" pleineLargeur disabled={chargement} onClick={enregistrerNumeroMobile}>
+                      Enregistrer le numéro
+                    </Button>
+                    <p className="resa-new__paiement-note" role="status">
+                      Le choix MTN/Airtel ne débite pas à lui seul. Cliquez sur « Demander le paiement sur le téléphone »; seul un statut confirmé par KPay crée un mouvement de caisse.
+                    </p>
+                  </>
+                )}
                 <Input
                   label={`Montant (${DEVISE})`}
                   type="number"
@@ -1482,9 +1545,29 @@ function ModaleDetail({
                   value={montant}
                   onChange={(e) => setMontant(e.target.value)}
                 />
-                <Button variante="succes" pleineLargeur disabled={chargement} onClick={encaisser}>
-                  Encaisser
-                </Button>
+                {!estMobileMoney(mode) && (
+                  <Button variante="succes" pleineLargeur disabled={chargement || paiementKpayEnAttente} onClick={encaisser}>
+                    Encaisser
+                  </Button>
+                )}
+                {estMobileMoney(mode) && (
+                  <Button variante="secondaire" pleineLargeur disabled={chargement || paiementKpayEnAttente} onClick={initierPaiementKpay}>
+                    {paiementKpayEnAttente ? 'Paiement KPay en cours de confirmation' : 'Demander le paiement sur le téléphone'}
+                  </Button>
+                )}
+                {resa.kpayExternalId && (
+                  <div className="fiche__kpay" role="status">
+                    <strong>Paiement KPay : {resa.kpayStatus ?? 'À vérifier'}</strong>
+                    <span>Référence {resa.kpayExternalId} · {formatArgent(resa.kpayAmount ?? 0)} {DEVISE}</span>
+                    {!resa.kpayRecorded && !['FAILED', 'CANCELLED'].includes(resa.kpayStatus) && (
+                      <Button variante="secondaire" pleineLargeur disabled={chargement} onClick={verifierPaiementKpay}>
+                        Vérifier le statut auprès de KPay
+                      </Button>
+                    )}
+                    {resa.kpayRecorded && <span>Confirmé par KPay et ajouté une seule fois à la caisse.</span>}
+                    {!resa.kpayRecorded && ['FAILED', 'CANCELLED'].includes(resa.kpayStatus) && <span>Échec ou annulation; aucun paiement n’a été ajouté à la caisse. Vous pouvez réessayer.</span>}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1735,7 +1818,9 @@ export default function BookingPage({ vueInitiale = 'liste', pleinEcran: pleinEc
         canal: form.canal
       })
       const acompte = Number(form.acompte || 0)
-      if (acompte > 0) {
+      if (acompte > 0 && estMobileMoney(form.modePaiement)) {
+        erreurAcompte = 'La création de réservation ne déclenche pas le paiement Mobile Money. Aucun paiement ni mouvement comptable n’a été créé; confirmez la réservation, connectez Django dans Paramètres, puis lancez KPay depuis sa fiche.'
+      } else if (acompte > 0) {
         // La réservation existe déjà : si l'encaissement échoue, on le signale sans bloquer la création.
         try {
           await window.electronAPI.encaisser(creee.id, {
@@ -1776,6 +1861,29 @@ export default function BookingPage({ vueInitiale = 'liste', pleinEcran: pleinEc
     return executer(
       () => window.electronAPI.encaisser(r.id, { montant, mode, nature }),
       `${formatArgent(montant)} ${DEVISE} encaissés${nature === 'acompte' ? ' (acompte)' : ''}.`
+    )
+  }
+
+  function enregistrerNumeroPaiement(r, numero) {
+    return executer(
+      () => window.electronAPI.update('reservation', r.id, { numeroPaiement: numero }),
+      'Numéro Mobile Money enregistré. Aucun débit n’a été lancé.'
+    )
+  }
+
+  async function initierPaiementKpay(r, montant, mode, numero) {
+    const ok = await executer(async () => {
+      await window.electronAPI.update('reservation', r.id, { modePaiement: mode, numeroPaiement: numero })
+      await window.electronAPI.kpay.initier(r.id, montant, mode, numero)
+    }, 'Demande KPay envoyée. Le client doit confirmer sur son téléphone; vérifiez ensuite le statut.')
+    if (!ok) await charger()
+    return ok
+  }
+
+  function verifierPaiementKpay(r, externalId) {
+    return executer(
+      () => window.electronAPI.kpay.statut(r.id, externalId),
+      'Statut récupéré. Seul le statut COMPLETED confirmé par le backend est ajouté à la caisse.'
     )
   }
 
@@ -1992,9 +2100,12 @@ export default function BookingPage({ vueInitiale = 'liste', pleinEcran: pleinEc
           onFermer={() => setSelectionId(null)}
           onErreur={setEchec}
           onEnregistrer={(form) => enregistrer(resaSelectionnee, form)}
+          onEnregistrerNumero={(numero) => enregistrerNumeroPaiement(resaSelectionnee, numero)}
           onAjouterConso={(serviceId, prix) => ajouterConso(resaSelectionnee, serviceId, prix)}
           onRetirerConso={retirerConso}
           onEncaisser={(montant, mode) => encaisser(resaSelectionnee, montant, mode)}
+          onKpayInitier={(montant, mode, numero) => initierPaiementKpay(resaSelectionnee, montant, mode, numero)}
+          onKpayVerifier={(externalId) => verifierPaiementKpay(resaSelectionnee, externalId)}
           onChangerStatut={(action, options) => changerStatut(resaSelectionnee, action, options)}
           onFacture={(canal) => facturer(resaSelectionnee, canal)}
           facturationEnCours={facturationEnCours}

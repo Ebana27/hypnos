@@ -191,6 +191,11 @@ export const reservation = sqliteTable(
     conditionsPaiement: text('conditions_paiement', { length: 500 }).notNull().default(''),
     modePaiement: text('mode_paiement', { enum: ['especes', 'carte', 'mtn_money', 'airtel_money'] }).notNull().default('especes'),
     numeroPaiement: text('numero_paiement', { length: 30 }).notNull().default(''),
+    kpayExternalId: text('kpay_external_id'),
+    kpayStatus: text('kpay_status'),
+    kpayMode: text('kpay_mode'),
+    kpayAmount: integer('kpay_amount'),
+    kpayRecorded: integer('kpay_recorded', { mode: 'boolean' }).notNull().default(false),
     statut: text('statut', {
       enum: ['en_attente', 'confirmee', 'en_sejour', 'terminee', 'annulee']
     })

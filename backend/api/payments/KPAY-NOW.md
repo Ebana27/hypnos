@@ -35,6 +35,15 @@ Copiez le secret HMAC du webhook dans `KPAY_WEBHOOK_SECRET`. Le secret de signat
 
 L’endpoint d’initialisation ne renvoie pas de lien Gateway si KPay n’a pas confirmé `isTest=true` avec une clé sandbox. Les clés `kpay_live_…` sont refusées sauf activation explicite `KPAY_ALLOW_LIVE_PAYMENTS=1`; ne changez pas ce réglage pour les essais.
 
+## Connexion depuis Hypnos Electron via ngrok
+
+1. Démarrez Django sur le port utilisé par ngrok, puis le tunnel (`ngrok http 8000`, si Django écoute sur 8000). Autorisez le nom d’hôte ngrok courant dans `ALLOWED_HOSTS`; configurez `KPAY_PUBLIC_BASE_URL` sur cette origine HTTPS et le webhook KPay sur `https://<hote-ngrok>/api/payments/kpay/webhook/`.
+2. Dans Hypnos, ouvrez **Paramètres → Backend Django et KPay**, saisissez uniquement l’origine ngrok (sans `/api` ni chemin), puis connectez-vous avec un compte Django actif.
+3. Ce compte doit être un compte du backend Django : les identifiants de connexion locale Hypnos ne créent pas de JWT et ne sont pas envoyés. Electron poste `username` et `password` à `/api/token/`, conserve les JWT en mémoire et les renouvelle avec `/api/token/refresh/`. Il faudra se reconnecter après avoir fermé l’application.
+4. Dans la fiche d’une réservation, sélectionnez MTN/Airtel, saisissez le numéro de test COG fourni par KPay, puis choisissez **Demander le paiement sur le téléphone**. Hypnos ne crée le mouvement de caisse qu’après lecture d’un statut `COMPLETED` et `isTest=true` auprès de Django.
+
+Le compte utilisé pour tester doit être présent et actif dans le backend Django. La connexion ngrok donne accès aux routes Django, mais ne crée pas ce compte; le provisionner via les mécanismes Django déjà configurés (par exemple l’administration). Ne partagez ni mot de passe ni JWT.
+
 ## Essai du checkout carte en sandbox
 
 Obtenez d’abord un JWT Hypnos via `/api/token/`, puis envoyez une initiation Gateway. L’exemple ne contacte l’API de paiement que si les clés sandbox sont configurées :
